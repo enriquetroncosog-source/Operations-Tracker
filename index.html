@@ -480,13 +480,26 @@ function fmtDateTime(d) {
 
 function extractBodyText(msg) {
   try {
-    const parts = msg.payload?.parts || [msg.payload];
-    for (const part of parts) {
-      if (part?.mimeType === 'text/plain' && part?.body?.data) {
-        return atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/')).substring(0, 500);
+    // Walk all parts recursively to find text/plain
+    const walk = (parts) => {
+      for (const part of (parts || [])) {
+        if (part?.mimeType === 'text/plain' && part?.body?.data) {
+          return atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/')).substring(0, 800);
+        }
+        if (part?.parts) {
+          const found = walk(part.parts);
+          if (found) return found;
+        }
       }
+      return null;
+    };
+    // Try parts first, then top-level body
+    const fromParts = walk(msg.payload?.parts || []);
+    if (fromParts) return fromParts;
+    if (msg.payload?.body?.data) {
+      return atob(msg.payload.body.data.replace(/-/g,'+').replace(/_/g,'/')).substring(0, 800);
     }
-  } catch(e) {}
+  } catch(e) { console.log('[CIS] body extract error:', e.message); }
   return '';
 }
 
@@ -548,9 +561,12 @@ function groupByOperation(messages) {
     const subject = getHeader(msg, 'Subject');
     const from = getHeader(msg, 'From');
     const date = parseDate(getHeader(msg, 'Date'));
-    const snippet = (msg.snippet || '') + ' ' + extractBodyText(msg);
-    const cajas = extractCajas(subject + ' ' + snippet);
-    const stage = detectStage(subject, from, snippet);
+    const snippet = msg.snippet || '';
+    const bodyText = extractBodyText(msg);
+    const fullText = subject + ' ' + snippet + ' ' + bodyText;
+    const cajas = extractCajas(fullText);
+    const stage = detectStage(subject, from, snippet + ' ' + bodyText);
+    console.log('[CIS]', subject.substring(0,50), '| snippet:', snippet.substring(0,80), '| stage:', stage);
     const party = detectParty(from);
     const name = parseName(from);
 
