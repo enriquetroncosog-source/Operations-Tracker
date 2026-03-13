@@ -390,7 +390,7 @@ async function gmailList(query, max=40) {
 }
 
 async function gmailGet(id) {
-  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=To&metadataHeaders=CC&fields=id,snippet,payload/headers`;
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`;
   const r = await fetch(url, {headers:{Authorization:'Bearer '+accessToken}});
   return r.json();
 }
@@ -478,6 +478,18 @@ function fmtDateTime(d) {
   return d.toLocaleDateString('es-MX', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'});
 }
 
+function extractBodyText(msg) {
+  try {
+    const parts = msg.payload?.parts || [msg.payload];
+    for (const part of parts) {
+      if (part?.mimeType === 'text/plain' && part?.body?.data) {
+        return atob(part.body.data.replace(/-/g,'+').replace(/_/g,'/')).substring(0, 500);
+      }
+    }
+  } catch(e) {}
+  return '';
+}
+
 // ─── Load operations ───
 async function loadRecent() {
   showState('loading', 'Cargando operaciones recientes de CECSO...');
@@ -536,7 +548,7 @@ function groupByOperation(messages) {
     const subject = getHeader(msg, 'Subject');
     const from = getHeader(msg, 'From');
     const date = parseDate(getHeader(msg, 'Date'));
-    const snippet = msg.snippet || '';
+    const snippet = (msg.snippet || '') + ' ' + extractBodyText(msg);
     const cajas = extractCajas(subject + ' ' + snippet);
     const stage = detectStage(subject, from, snippet);
     const party = detectParty(from);
