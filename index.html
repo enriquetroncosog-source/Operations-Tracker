@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CIS · Operations Tracker v5</title>
+<title>CIS · Operations Tracker v8</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -240,7 +240,7 @@ const CONFIG = {
     <div class="header-left">
       <div class="logo-sm">CIS</div>
       <span class="header-title">Operations Tracker</span>
-      <span class="header-badge">CECSO</span><span style="font-size:10px;color:var(--text3);margin-left:4px">v5</span>
+      <span class="header-badge">CECSO</span><span style="font-size:10px;color:var(--text3);margin-left:4px">v8</span>
     </div>
     <div class="header-right">
       <div class="user-pill">
@@ -403,14 +403,19 @@ function getHeader(msg, name) {
 // ─── Parsing helpers ───
 function extractCajas(text) {
   const matches = [];
-  // Match "caja W85023" or "caja 85023"
-  const re1 = /caja\s+(W?\d{4,7})/gi;
+  // Match anything after "caja" separator: "caja 555332", "caja: W85023", "Caja: H01210", "caja/523340"
+  // Captures alphanumeric IDs of 3-10 chars (letters+numbers)
+  const re1 = /caja[:\s\/\s#]+([A-Z0-9]{3,10})/gi;
   let m;
-  while ((m = re1.exec(text)) !== null) matches.push(m[1].toUpperCase());
-  // Match standalone W+digits like W85023
-  const re2 = /\b(W\d{4,7})\b/gi;
+  while ((m = re1.exec(text)) !== null) {
+    const val = m[1].toUpperCase();
+    // Exclude common false positives like "555332/" — strip trailing slashes
+    matches.push(val.replace(/\/$/, ''));
+  }
+  // Also match letter+digit patterns standalone: W85023, H01210, etc.
+  const re2 = /\b([A-Z]\d{4,7})\b/gi;
   while ((m = re2.exec(text)) !== null) matches.push(m[1].toUpperCase());
-  return [...new Set(matches)];
+  return [...new Set(matches.filter(v => v.length >= 3))];
 }
 
 function isSimilar(str, target) {
@@ -530,11 +535,11 @@ async function doSearch() {
     // Search 1: all emails mentioning this caja
     const r1 = await gmailList(`${valClean} OR "caja ${valClean}"`, 60);
     const ids1 = (r1.messages || []).map(m => m.id);
-    // Search 2: emails from Enrique with despachada/despachado that mention the caja
-    const r2 = await gmailList(`from:enrique despachad* ${valClean}`, 20);
+    // Search 2: emails with despachada/despachado mentioning the caja
+    const r2 = await gmailList(`(despachada OR despachado OR despachada.) ${valClean}`, 20);
     const ids2 = (r2.messages || []).map(m => m.id);
-    // Search 3: any email with despachada mentioning this caja
-    const r3 = await gmailList(`despachad* ${valClean}`, 20);
+    // Search 3: from enrique with caja number (catches his forward confirmations)
+    const r3 = await gmailList(`from:enrique (${valClean} OR caja ${valClean}) newer_than:90d`, 20);
     const ids3 = (r3.messages || []).map(m => m.id);
     // Merge unique IDs
     const allIds = [...new Set([...ids1, ...ids2, ...ids3])];
