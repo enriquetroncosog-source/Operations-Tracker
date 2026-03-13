@@ -629,7 +629,6 @@ function groupByOperation(messages) {
     const name = parseName(from);
 
     const keys = cajas.length ? cajas : ['_sin_caja'];
-    const fullText = subject + ' ' + snippet + ' ' + (msg.bodyText||'');
     const pedimento = extractPedimento(fullText);
     const factura = extractFactura(fullText);
 
