@@ -390,7 +390,7 @@ async function gmailList(query, max=40) {
 }
 
 async function gmailGet(id) {
-  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=To&metadataHeaders=CC`;
+  const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From&metadataHeaders=Date&metadataHeaders=To&metadataHeaders=CC&fields=id,snippet,payload/headers`;
   const r = await fetch(url, {headers:{Authorization:'Bearer '+accessToken}});
   return r.json();
 }
@@ -413,11 +413,33 @@ function extractCajas(text) {
   return [...new Set(matches)];
 }
 
-function detectStage(subject, from) {
-  const s = (subject + ' ' + from).toLowerCase();
+function isSimilar(str, target) {
+  // Fuzzy match: checks if str contains something close to target
+  // Handles typos by allowing 1-2 char differences using sliding window
+  str = str.toLowerCase(); target = target.toLowerCase();
+  if (str.includes(target)) return true;
+  // Remove vowels and compare consonant skeleton (catches despacahda, deapchado, etc)
+  const skelStr = str.replace(/[aeiou]/g,'');
+  const skelTarget = target.replace(/[aeiou]/g,'');
+  if (skelStr.includes(skelTarget)) return true;
+  return false;
+}
+
+function detectStage(subject, from, snippet='') {
+  const s = (subject + ' ' + from + ' ' + snippet).toLowerCase();
+
   if (/factura.*honorar|honorarios|facturaci/i.test(s)) return 'facturado';
-  // "despachada" or body says despachada = despachado stage
-  if (/despachad|liberado|libre|salida.*aduana|fwd:.*despacho/i.test(s)) return 'despachado';
+
+  // Fuzzy despachado detection — covers typos like:
+  // despachada, despacahda, despachdo, despachdo, deapcahdo, dsepachado, etc.
+  if (
+    /despacha[d]?[ao]?|d[e3]sp[a4]ch[a4]d[ao]|despa[cks]h|despach[aeio]/i.test(s) ||
+    /d.sp.ch.d/i.test(s) ||
+    isSimilar(s, 'despachado') ||
+    isSimilar(s, 'despachada') ||
+    /liberado|libre|salida.*aduana|fwd:.*despacho/i.test(s)
+  ) return 'despachado';
+
   if (/\bmve\b|solicitud.*mve|mva/i.test(s)) return 'mve';
   if (/\bcove\b|pedimento|pago.*impuesto|manifestaci/i.test(s)) return 'docs_despacho';
   if (/clasificac|fraccion|tarifa|hts/i.test(s)) return 'clasificacion';
@@ -514,8 +536,9 @@ function groupByOperation(messages) {
     const subject = getHeader(msg, 'Subject');
     const from = getHeader(msg, 'From');
     const date = parseDate(getHeader(msg, 'Date'));
-    const cajas = extractCajas(subject);
-    const stage = detectStage(subject, from);
+    const snippet = msg.snippet || '';
+    const cajas = extractCajas(subject + ' ' + snippet);
+    const stage = detectStage(subject, from, snippet);
     const party = detectParty(from);
     const name = parseName(from);
 
