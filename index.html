@@ -403,18 +403,23 @@ function getHeader(msg, name) {
 // ─── Parsing helpers ───
 function extractCajas(text) {
   const matches = [];
-  const re = /(?:caja[:\s#]*)?(\d{5,7})/gi;
+  // Match "caja W85023" or "caja 85023"
+  const re1 = /caja\s+(W?\d{4,7})/gi;
   let m;
-  while ((m = re.exec(text)) !== null) matches.push(m[1]);
+  while ((m = re1.exec(text)) !== null) matches.push(m[1].toUpperCase());
+  // Match standalone W+digits like W85023
+  const re2 = /\b(W\d{4,7})\b/gi;
+  while ((m = re2.exec(text)) !== null) matches.push(m[1].toUpperCase());
   return [...new Set(matches)];
 }
 
 function detectStage(subject, from) {
   const s = (subject + ' ' + from).toLowerCase();
   if (/factura.*honorar|honorarios|facturaci/i.test(s)) return 'facturado';
-  if (/despacha|liberado|libre|salida.*aduana/i.test(s)) return 'despachado';
+  // "despachada" or body says despachada = despachado stage
+  if (/despachad|liberado|libre|salida.*aduana|fwd:.*despacho/i.test(s)) return 'despachado';
   if (/\bmve\b|solicitud.*mve|mva/i.test(s)) return 'mve';
-  if (/\bcove\b|pedimento|pago.*impuesto/i.test(s)) return 'docs_despacho';
+  if (/\bcove\b|pedimento|pago.*impuesto|manifestaci/i.test(s)) return 'docs_despacho';
   if (/clasificac|fraccion|tarifa|hts/i.test(s)) return 'clasificacion';
   if (/proforma|cotizaci/i.test(s)) return 'proforma';
   return 'docs_recibidos';
