@@ -615,26 +615,31 @@ function renderDetail(op) {
     </div>`;
   }).join('');
 
-  // Infer documents from emails
+  // Infer documents from emails + stage progression
   const allText = op.emails.map(e => e.subject.toLowerCase() + ' ' + e.from.toLowerCase()).join(' ');
-  const docs = [
-    {key:'bl',    name:'Bill of Lading',    found:/bill of lading|\bbl\b|rpt040/i.test(allText)},
-    {key:'manif', name:'Shipping Manifest', found:/manifest|rpt020/i.test(allText)},
-    {key:'inv',   name:'Invoice comercial', found:/invoice|factura.*(proveedor|comercial)/i.test(allText)},
-    {key:'cert',  name:'Certificado calidad',found:/certificad|quality cert/i.test(allText)},
-    {key:'cove',  name:'COVE',              found:/\bcove\b/i.test(allText)},
-    {key:'ped',   name:'Pedimento',         found:/pedimento/i.test(allText)},
-    {key:'fhon',  name:'Factura honorarios',found:/factura.*honor|honorarios/i.test(allText)},
-  ];
-  const dateForDoc = (key) => {
-    const found = op.emails.find(e => e.subject.toLowerCase().includes(key) || e.subject.toLowerCase().includes('invoice'));
-    return found ? fmtDate(found.date) : '';
+  const stageReached = (stageId) => si >= (STAGE_IDX[stageId] ?? 99);
+  const firstEmailDate = op.emails.length ? fmtDate(op.emails[op.emails.length-1].date) : '';
+  const stageDate = (stageId) => {
+    const e = op.emails.filter(em => em.stage === stageId).sort((a,b)=>a.date-b.date)[0];
+    return e ? fmtDate(e.date) : firstEmailDate;
   };
+  // Docs needed before clasificacion: BL, manifest, invoice
+  // Docs needed before mve: cove, pedimento
+  // Factura honorarios only when facturado
+  const docs = [
+    {name:'Bill of Lading',     found: stageReached('clasificacion') || /rpt040|lading/i.test(allText),     date: stageDate('docs_recibidos')},
+    {name:'Shipping Manifest',  found: stageReached('clasificacion') || /rpt020|manifest/i.test(allText),   date: stageDate('docs_recibidos')},
+    {name:'Invoice comercial',  found: stageReached('clasificacion') || /invoice|26NI/i.test(allText),      date: stageDate('docs_recibidos')},
+    {name:'Certificado calidad',found: /certificad|quality cert/i.test(allText),                           date: stageDate('docs_recibidos')},
+    {name:'COVE',               found: stageReached('mve') || /\bcove\b/i.test(allText),                   date: stageDate('docs_despacho')},
+    {name:'Pedimento',          found: stageReached('mve') || /pedimento/i.test(allText),                  date: stageDate('docs_despacho')},
+    {name:'Factura honorarios', found: stageReached('facturado') || /honorarios|honor/i.test(allText),     date: stageDate('facturado')},
+  ];
   const docsHtml = docs.map(d => `
     <div class="doc-item">
       <div class="doc-icon ${d.found?'yes':'no'}">${d.found?'✓':'−'}</div>
       <span class="doc-name">${d.name}</span>
-      <span class="doc-date">${d.found ? (dateForDoc(d.key)||'') : ''}</span>
+      <span class="doc-date">${d.found ? d.date : ''}</span>
     </div>
   `).join('');
 
