@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CIS · Operations Tracker v8</title>
+<title>CIS · Operations Tracker v9</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -240,7 +240,7 @@ const CONFIG = {
     <div class="header-left">
       <div class="logo-sm">CIS</div>
       <span class="header-title">Operations Tracker</span>
-      <span class="header-badge">CECSO</span><span style="font-size:10px;color:var(--text3);margin-left:4px">v8</span>
+      <span class="header-badge">CECSO</span><span style="font-size:10px;color:var(--text3);margin-left:4px">v9</span>
     </div>
     <div class="header-right">
       <div class="user-pill">
@@ -401,6 +401,16 @@ function getHeader(msg, name) {
 }
 
 // ─── Parsing helpers ───
+function extractPedimento(text) {
+  const m = text.match(/pedimento[:\s#]+([\d]{6,10})/i);
+  return m ? m[1] : null;
+}
+
+function extractFactura(text) {
+  const m = text.match(/factura[:\s#]+([A-Z0-9]{4,20})/i);
+  return m ? m[1].toUpperCase() : null;
+}
+
 function extractCajas(text) {
   const matches = [];
   // Match anything after "caja" separator: "caja 555332", "caja: W85023", "Caja: H01210", "caja/523340"
@@ -539,20 +549,49 @@ async function doSearch() {
     const r2 = await gmailList(`(despachada OR despachado OR despachada.) ${valClean}`, 20);
     const ids2 = (r2.messages || []).map(m => m.id);
     // Search 3: from enrique with caja number (catches his forward confirmations)
-    const r3 = await gmailList(`from:enrique (${valClean} OR caja ${valClean}) newer_than:90d`, 20);
+    const r3 = await gmailList(`from:enrique (${valClean} OR "caja ${valClean}") newer_than:90d`, 20);
     const ids3 = (r3.messages || []).map(m => m.id);
-    // Merge unique IDs
+    // Merge unique IDs for first pass
     const allIds = [...new Set([...ids1, ...ids2, ...ids3])];
     if (!allIds.length) { showState('empty', `No se encontraron correos para "${val}".`); return; }
     const details = await fetchMessages(allIds);
     const ops = groupByOperation(details);
-    if (ops.length === 1) {
-      renderDetail(ops[0]);
+    // Find the main op
+    let mainOp = ops.find(o => o.caja === valClean || o.caja === val || o.caja.replace('/','') === valClean);
+    if (!mainOp && ops.length === 1) mainOp = ops[0];
+
+    if (mainOp) {
+      // 2nd pass: search billing emails by pedimento and factura numbers
+      const pedRef = mainOp.pedimentos[0];
+      const facRef = mainOp.facturas[0];
+      if (pedRef || facRef) {
+        const query = [pedRef, facRef].filter(Boolean).join(' OR ');
+        const rBill = await gmailList(query, 20);
+        const billIds = (rBill.messages || []).map(m => m.id).filter(id => !allIds.includes(id));
+        if (billIds.length) {
+          const billDetails = await fetchMessages(billIds);
+          // Add billing emails to main op
+          billDetails.forEach(msg => {
+            const subj = getHeader(msg, 'Subject');
+            const frm = getHeader(msg, 'From');
+            const dt = parseDate(getHeader(msg, 'Date'));
+            const snip = msg.snippet || '';
+            const stage = detectStage(subj, frm, snip);
+            const party = detectParty(frm);
+            mainOp.emails.push({subject: subj, from: frm, fromName: parseName(frm), date: dt, stage, party});
+          });
+          // Re-sort and recalculate stage
+          mainOp.emails.sort((a,b) => b.date - a.date);
+          mainOp.emailCount = mainOp.emails.length;
+          const newHighest = Math.max(...mainOp.emails.map(e => STAGE_IDX[e.stage] ?? 0));
+          mainOp.currentStageIdx = newHighest;
+          mainOp.currentStage = STAGES[newHighest]?.id || mainOp.currentStage;
+          mainOp.status = newHighest >= STAGE_IDX['facturado'] ? 'done' : 'prog';
+        }
+      }
+      renderDetail(mainOp);
     } else if (ops.length > 1) {
-      // Find the op matching our search
-      const match = ops.find(o => o.caja === valClean || o.caja === val || o.caja.includes(val));
-      if (match) renderDetail(match);
-      else renderBoard(ops);
+      renderBoard(ops);
     } else {
       showState('empty', 'No se pudo agrupar en operaciones.');
     }
@@ -581,6 +620,7 @@ function groupByOperation(messages) {
     const date = parseDate(getHeader(msg, 'Date'));
     const snippet = msg.snippet || '';
     const bodyText = extractBodyText(msg);
+    msg.bodyText = bodyText;
     const fullText = subject + ' ' + snippet + ' ' + bodyText;
     const cajas = extractCajas(fullText);
     const stage = detectStage(subject, from, snippet + ' ' + bodyText);
@@ -589,11 +629,17 @@ function groupByOperation(messages) {
     const name = parseName(from);
 
     const keys = cajas.length ? cajas : ['_sin_caja'];
+    const fullText = subject + ' ' + snippet + ' ' + (msg.bodyText||'');
+    const pedimento = extractPedimento(fullText);
+    const factura = extractFactura(fullText);
+
     keys.forEach(key => {
-      if (!groups[key]) groups[key] = {caja: key, emails: [], stages: new Set(), parties: {}};
-      groups[key].emails.push({subject, from, fromName: name, date, stage, party});
+      if (!groups[key]) groups[key] = {caja: key, emails: [], stages: new Set(), parties: {}, pedimentos: new Set(), facturas: new Set()};
+      groups[key].emails.push({subject, from, fromName: name, date, stage, party, pedimento, factura});
       groups[key].stages.add(stage);
       if (!groups[key].parties[party]) groups[key].parties[party] = name;
+      if (pedimento) groups[key].pedimentos.add(pedimento);
+      if (factura) groups[key].facturas.add(factura);
     });
   });
 
@@ -605,6 +651,8 @@ function groupByOperation(messages) {
       const highestStage = Math.max(...g.emails.map(e => STAGE_IDX[e.stage] ?? 0));
       const currentStageId = STAGES[highestStage]?.id || 'docs_recibidos';
       console.log('[CIS GROUP]', g.caja, '| emails:', g.emails.length, '| stages:', g.emails.map(e=>e.stage).join(','), '| highest:', currentStageId);
+      const pedimentos = [...(g.pedimentos||[])];
+      const facturas = [...(g.facturas||[])];
       return {
         caja: g.caja,
         currentStage: currentStageId,
@@ -614,6 +662,8 @@ function groupByOperation(messages) {
         emails: sortedEmails,
         parties: g.parties,
         stages: g.stages,
+        pedimentos,
+        facturas,
         status: highestStage >= STAGE_IDX['facturado'] ? 'done' : 'prog',
       };
     })
@@ -764,6 +814,8 @@ function renderDetail(op) {
         <div class="detail-sub">
           <span>CECSO</span>
           ${partyNames ? `<span>${partyNames}</span>` : ''}
+          ${op.pedimentos?.length ? `<span>Ped: ${op.pedimentos.join(', ')}</span>` : ''}
+          ${op.facturas?.length ? `<span>Fac: ${op.facturas.join(', ')}</span>` : ''}
           <span>${lu}</span>
           <span>${op.emailCount} correos</span>
         </div>
