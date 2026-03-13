@@ -526,7 +526,8 @@ async function doSearch() {
   showState('loading', `Buscando operación "${val}" en Gmail...`);
   showBoardView();
   try {
-    const result = await gmailList(`"${val}" OR "${val.replace(/\s+/g,'')}"`, 30);
+    const valClean = val.toUpperCase().trim();
+    const result = await gmailList(`${valClean} OR "caja ${valClean}"`, 60);
     const msgs = result.messages || [];
     if (!msgs.length) { showState('empty', `No se encontraron correos para "${val}".`); return; }
     const details = await fetchMessages(msgs.map(m => m.id));
@@ -583,8 +584,10 @@ function groupByOperation(messages) {
     .filter(g => g.caja !== '_sin_caja' && g.emails.length > 0)
     .map(g => {
       const sortedEmails = g.emails.sort((a,b) => b.date - a.date);
-      const highestStage = Math.max(...[...g.stages].map(s => STAGE_IDX[s] ?? 0));
+      // Use highest stage found across ALL emails (not just most recent)
+      const highestStage = Math.max(...g.emails.map(e => STAGE_IDX[e.stage] ?? 0));
       const currentStageId = STAGES[highestStage]?.id || 'docs_recibidos';
+      console.log('[CIS GROUP]', g.caja, '| emails:', g.emails.length, '| stages:', g.emails.map(e=>e.stage).join(','), '| highest:', currentStageId);
       return {
         caja: g.caja,
         currentStage: currentStageId,
