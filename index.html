@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CIS · Operations Tracker v9</title>
+<title>CIS · Operations Tracker v10</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -240,7 +240,7 @@ const CONFIG = {
     <div class="header-left">
       <div class="logo-sm">CIS</div>
       <span class="header-title">Operations Tracker</span>
-      <span class="header-badge">CECSO</span><span style="font-size:10px;color:var(--text3);margin-left:4px">v9</span>
+      <span class="header-badge">CECSO</span><span style="font-size:10px;color:var(--text3);margin-left:4px">v10</span>
     </div>
     <div class="header-right">
       <div class="user-pill">
@@ -340,21 +340,46 @@ function saveClientId() {
 // ─── Auth ───
 function initGSI() {
   if (!isClientIdSet()) return;
-  tokenClient = google.accounts.oauth2.initTokenClient({
-    client_id: getClientId(),
-    scope: CONFIG.SCOPES,
-    callback: (resp) => {
-      if (resp.error) { alert('Error de autenticación: ' + resp.error); return; }
-      accessToken = resp.access_token;
-      fetchUserInfo().then(showApp);
-    }
-  });
+  if (typeof google === 'undefined' || !google.accounts) return;
+  try {
+    tokenClient = google.accounts.oauth2.initTokenClient({
+      client_id: getClientId(),
+      scope: CONFIG.SCOPES,
+      callback: (resp) => {
+        if (resp.error) {
+          console.error('[CIS] Auth error:', resp.error);
+          alert('Error de autenticación: ' + resp.error + '\n\nVerifica que tu URL esté en los orígenes autorizados en Google Cloud Console.');
+          return;
+        }
+        accessToken = resp.access_token;
+        fetchUserInfo().then(showApp);
+      }
+    });
+    console.log('[CIS] GSI initialized OK');
+  } catch(e) {
+    console.error('[CIS] initGSI error:', e.message);
+  }
 }
 
 function startAuth() {
   if (!isClientIdSet()) { showConfigModal(); return; }
-  if (!tokenClient) { setTimeout(initGSI, 500); setTimeout(startAuth, 800); return; }
-  tokenClient.requestAccessToken({prompt: 'select_account'});
+  // Wait for google GSI to load if not ready
+  if (typeof google === 'undefined' || !google.accounts) {
+    document.querySelector('.btn-google').textContent = 'Cargando...';
+    setTimeout(startAuth, 500);
+    return;
+  }
+  if (!tokenClient) {
+    initGSI();
+    setTimeout(startAuth, 500);
+    return;
+  }
+  try {
+    tokenClient.requestAccessToken({prompt: 'select_account'});
+  } catch(e) {
+    console.error('[CIS] requestAccessToken error:', e.message);
+    alert('Error al conectar con Google: ' + e.message);
+  }
 }
 
 function logout() {
