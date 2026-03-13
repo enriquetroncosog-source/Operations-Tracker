@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>CIS · Operations Tracker v4</title>
+<title>CIS · Operations Tracker v5</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
 :root{
@@ -240,7 +240,7 @@ const CONFIG = {
     <div class="header-left">
       <div class="logo-sm">CIS</div>
       <span class="header-title">Operations Tracker</span>
-      <span class="header-badge">CECSO</span><span style="font-size:10px;color:var(--text3);margin-left:4px">v4</span>
+      <span class="header-badge">CECSO</span><span style="font-size:10px;color:var(--text3);margin-left:4px">v5</span>
     </div>
     <div class="header-right">
       <div class="user-pill">
@@ -527,15 +527,27 @@ async function doSearch() {
   showBoardView();
   try {
     const valClean = val.toUpperCase().trim();
-    const result = await gmailList(`${valClean} OR "caja ${valClean}"`, 60);
-    const msgs = result.messages || [];
-    if (!msgs.length) { showState('empty', `No se encontraron correos para "${val}".`); return; }
-    const details = await fetchMessages(msgs.map(m => m.id));
+    // Search 1: all emails mentioning this caja
+    const r1 = await gmailList(`${valClean} OR "caja ${valClean}"`, 60);
+    const ids1 = (r1.messages || []).map(m => m.id);
+    // Search 2: emails from Enrique with despachada/despachado that mention the caja
+    const r2 = await gmailList(`from:enrique despachad* ${valClean}`, 20);
+    const ids2 = (r2.messages || []).map(m => m.id);
+    // Search 3: any email with despachada mentioning this caja
+    const r3 = await gmailList(`despachad* ${valClean}`, 20);
+    const ids3 = (r3.messages || []).map(m => m.id);
+    // Merge unique IDs
+    const allIds = [...new Set([...ids1, ...ids2, ...ids3])];
+    if (!allIds.length) { showState('empty', `No se encontraron correos para "${val}".`); return; }
+    const details = await fetchMessages(allIds);
     const ops = groupByOperation(details);
     if (ops.length === 1) {
       renderDetail(ops[0]);
     } else if (ops.length > 1) {
-      renderBoard(ops);
+      // Find the op matching our search
+      const match = ops.find(o => o.caja === valClean || o.caja === val || o.caja.includes(val));
+      if (match) renderDetail(match);
+      else renderBoard(ops);
     } else {
       showState('empty', 'No se pudo agrupar en operaciones.');
     }
