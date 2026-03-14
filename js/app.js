@@ -22,7 +22,7 @@ const App = {
     // Hide login, show app
     LoginComponent.hide();
     const app = document.getElementById('app');
-    app.style.display = 'flex';
+    app.classList.add('visible');
 
     // Render app components
     DashboardComponent.renderHeader();
@@ -54,7 +54,7 @@ const App = {
   logout() {
     Auth.logout();
     this.allOps = [];
-    document.getElementById('app').style.display = 'none';
+    document.getElementById('app').classList.remove('visible');
     LoginComponent.render();
   }
 };
