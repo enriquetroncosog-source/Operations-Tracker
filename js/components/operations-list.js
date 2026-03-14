@@ -66,23 +66,22 @@ const OperationsList = {
     ).join('');
     const stageLabel = STAGES[si]?.label || '—';
     const dateStr = Parser.fmtDate(op.lastUpdate);
-
     const statusClass = op.status === 'despachado' ? 'done' :
                          op.status === 'bodega' ? 'attn' : 'prog';
-    const cajaLine = op.cajas.length ? `<span style="color:var(--text3);font-size:11px">Caja: ${op.cajas.join(', ')}</span>` : '';
+    const subLine = op.caja || (op.cajas?.length ? `Caja: ${op.cajas.join(', ')}` : '');
 
     return `<div class="op-card" data-id="${op.id}" data-status="${op.status}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
         <div class="op-ref">${op.displayRef}</div>
         <div class="status-dot ${statusClass}"></div>
       </div>
-      ${cajaLine}
+      ${subLine ? `<span style="color:var(--text3);font-size:11px">Caja: ${subLine}</span>` : ''}
       <div class="op-stage">${stageLabel} · ${Parser.getStatusLabel(op.status)}</div>
       <div class="mini-track">${dots}</div>
       <div class="op-foot">
         <div class="op-meta">
           <span>${dateStr}</span>
-          <span>${op.emailCount} correos</span>
+          <span>${op.emailCount || 0} correos</span>
         </div>
       </div>
     </div>`;
@@ -93,7 +92,6 @@ const OperationsList = {
       Router.navigate('dashboard');
     });
 
-    // Card clicks
     document.querySelectorAll('#operations-list-view .op-card').forEach(card => {
       card.addEventListener('click', () => {
         const id = card.dataset.id;
@@ -102,7 +100,6 @@ const OperationsList = {
       });
     });
 
-    // Filter chips
     document.querySelectorAll('.filter-chip').forEach(chip => {
       chip.addEventListener('click', () => {
         document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));

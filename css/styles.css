@@ -222,6 +222,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:14
 .step code{font-family:var(--mono);font-size:11px;background:var(--surface3);padding:1px 5px;border-radius:3px;color:var(--info)}
 .modal-footer{display:flex;gap:8px;justify-content:flex-end;padding-top:12px;border-top:1px solid var(--border)}
 
+/* ========== FORM ========== */
+.form-label{display:block;font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:0.4px;margin-bottom:4px;margin-top:4px}
+.btn-sm{font-size:12px;padding:5px 12px;border-radius:6px}
+.btn-danger{color:var(--danger);border-color:rgba(239,68,68,0.3)}
+.btn-danger:hover{background:rgba(239,68,68,0.1);border-color:var(--danger)}
+
 /* ========== RESPONSIVE ========== */
 @media(max-width:900px){
   .stats-row{grid-template-columns:repeat(2,1fr)}

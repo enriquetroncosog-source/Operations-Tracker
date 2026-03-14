@@ -24,7 +24,6 @@ const OperationDetail = {
   },
 
   renderAttachments(attachments) {
-    // Build a map: slot label -> attachment (first match wins)
     const slotMap = {};
     for (const att of (attachments || [])) {
       const slotLabel = this.matchAttachmentToSlot(att);
@@ -88,51 +87,24 @@ const OperationDetail = {
       </div>`;
     }).join('');
 
-    // Infer documents
-    const allText = op.emails.map(e => e.subject.toLowerCase() + ' ' + e.from.toLowerCase()).join(' ');
-    const stageReached = (stageId) => si >= (STAGE_IDX[stageId] ?? 99);
-    const firstEmailDate = op.emails.length ? Parser.fmtDate(op.emails[op.emails.length - 1].date) : '';
-    const stageDate = (stageId) => {
-      const e = op.emails.filter(em => em.stage === stageId).sort((a, b) => a.date - b.date)[0];
-      return e ? Parser.fmtDate(e.date) : firstEmailDate;
-    };
-
-    const docs = [
-      { name: 'Bill of Lading',       found: stageReached('proforma') || /rpt040|lading/i.test(allText),   date: stageDate('docs_proveedor') },
-      { name: 'Shipping Manifest',    found: stageReached('proforma') || /rpt020|manifest/i.test(allText), date: stageDate('docs_proveedor') },
-      { name: 'Invoice comercial',    found: stageReached('proforma') || /invoice|26NI/i.test(allText),    date: stageDate('docs_proveedor') },
-      { name: 'Proforma',             found: stageReached('proforma') || /proforma|pedimento/i.test(allText), date: stageDate('proforma') },
-      { name: 'DODA',                 found: stageReached('doda') || /\bdoda\b/i.test(allText),            date: stageDate('doda') },
-    ];
-
-    const docsHtml = docs.map(d => `
-      <div class="doc-item">
-        <div class="doc-icon ${d.found ? 'yes' : 'no'}">${d.found ? '✓' : '○'}</div>
-        <span class="doc-name">${d.name}</span>
-        <span class="doc-date">${d.found ? d.date : ''}</span>
-      </div>
-    `).join('');
-
-
     // Operation info
     const d = op.opData || {};
-    const allParties = { ...op.parties };
     const infoHtml = `
       <div class="info-row">
         <span class="info-label">Proveedor</span>
-        <span class="info-value">${allParties.proveedor || '—'}</span>
+        <span class="info-value">${op.proveedor || op.parties?.proveedor || '—'}</span>
       </div>
       <div class="info-row">
         <span class="info-label">Transportista</span>
-        <span class="info-value">${allParties.transportista || '—'}</span>
+        <span class="info-value">${op.transportista || op.parties?.transportista || '—'}</span>
       </div>
       <div class="info-row">
         <span class="info-label">Caja / Econ.</span>
-        <span class="info-value">${op.cajas.length ? op.cajas.join(', ') : '—'}</span>
+        <span class="info-value">${op.caja || (op.cajas?.length ? op.cajas.join(', ') : '—')}</span>
       </div>
       <div class="info-row">
         <span class="info-label">Invoice</span>
-        <span class="info-value">${op.facturas.length ? op.facturas.join(', ') : '—'}</span>
+        <span class="info-value">${op.invoice || (op.facturas?.length ? op.facturas.join(', ') : '—')}</span>
       </div>
       ${d.bol ? `<div class="info-row">
         <span class="info-label">BOL</span>
@@ -145,7 +117,7 @@ const OperationDetail = {
     `;
 
     // Emails log
-    const emailsHtml = op.emails.map(e => `
+    const emailsHtml = op.emails.length ? op.emails.map(e => `
       <div class="email-entry">
         <div class="e-line ${e.party}"></div>
         <div class="e-body">
@@ -158,7 +130,7 @@ const OperationDetail = {
           ${e.summary ? `<div class="e-snippet">${e.summary}</div>` : ''}
         </div>
       </div>
-    `).join('');
+    `).join('') : '<div style="color:var(--text3);font-size:12px;padding:8px 0">No se encontraron correos asociados.</div>';
 
     // Status pill
     let statusPillClass = 'prog';
@@ -183,15 +155,19 @@ const OperationDetail = {
 
       <div class="detail-header">
         <div>
-          <div class="detail-ref">${op.invoice ? op.invoice : 'Caja ' + op.displayRef}</div>
+          <div class="detail-ref">${op.displayRef || op.invoice || op.caja || '—'}</div>
           <div class="detail-sub">
-            ${op.cajas.length ? `<span>Caja: ${op.cajas.join(', ')}</span>` : ''}
-            ${op.pedimentos.length ? `<span>Ped: ${op.pedimentos.join(', ')}</span>` : ''}
+            ${op.caja ? `<span>Caja: ${op.caja}</span>` : ''}
+            ${op.pedimentos?.length ? `<span>Ped: ${op.pedimentos.join(', ')}</span>` : ''}
             <span>${lu}</span>
-            <span>${op.emailCount} correos</span>
+            <span>${op.emailCount || 0} correos</span>
           </div>
         </div>
-        <span class="status-pill ${statusPillClass}">${statusPillText}</span>
+        <div style="display:flex;align-items:center;gap:8px">
+          <button class="btn-secondary btn-sm" id="detail-edit">Editar</button>
+          <button class="btn-secondary btn-sm btn-danger" id="detail-delete">Eliminar</button>
+          <span class="status-pill ${statusPillClass}">${statusPillText}</span>
+        </div>
       </div>
 
       <div class="timeline-wrap">
@@ -205,10 +181,6 @@ const OperationDetail = {
             <div class="panel-title">Información</div>
             ${infoHtml}
           </div>
-          <div class="panel" style="margin-bottom:10px">
-            <div class="panel-title">Documentos</div>
-            ${docsHtml}
-          </div>
           ${this.renderAttachments(op.attachments)}
         </div>
         <div class="panel">
@@ -220,6 +192,16 @@ const OperationDetail = {
 
     document.getElementById('detail-back').addEventListener('click', () => {
       Router.back();
+    });
+
+    document.getElementById('detail-edit').addEventListener('click', () => {
+      DashboardComponent.showOpForm(op);
+    });
+
+    document.getElementById('detail-delete').addEventListener('click', () => {
+      if (confirm('¿Eliminar esta operación?')) {
+        App.deleteOperation(op.id);
+      }
     });
   }
 };
