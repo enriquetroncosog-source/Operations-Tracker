@@ -99,31 +99,23 @@ const Parser = {
 
   // Extract transportista from text
   extractTransportista(text) {
-    // Normalize whitespace: replace all types of line breaks and multiple spaces
     const t = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    const patterns = [
-      // "Transfer Carrier\nINTRANSPORT TRUCKING INC"
-      /Transfer\s+Carrier[\s\n:]+([A-Z][A-Z0-9\s&.,'-]+(?:INC|LLC|SA|CORP|CO)?)/i,
-      // "Carrier\nNAME" or "Carrier: NAME"
-      /(?:carrier|transporte|transportista|freight|trucker|fletera|linea\s+de\s+transporte)[\s\n:]+([A-Z][A-Z0-9\s&.,'-]{3,})/i,
-      // Look for known trucking company patterns (ends with INC, LLC, TRUCKING, TRANSPORT, FREIGHT, LOGISTICS)
-      /\b([A-Z][A-Z0-9\s&.,'-]*(?:TRUCKING|TRANSPORT|FREIGHT|LOGISTICS|CARRIERS?)\s*(?:INC|LLC|SA|CORP|CO)?)\b/i,
-    ];
+    // 1. Exact pattern: "Transfer Carrier" followed by company name on next line
+    const m1 = t.match(/Transfer\s+Carrier[\s\n:]+([A-Z][A-Z0-9\s&.'-]{3,})/);
+    if (m1) return m1[1].trim().replace(/\s+/g, ' ').replace(/[,.\s]+$/, '');
 
-    const falsePositives = ['SCAC', 'CAAT', 'TRANSFER', 'CARRIER'];
-
-    for (const re of patterns) {
-      const m = t.match(re);
-      if (m) {
-        let val = m[1] ? m[1].trim() : m[0].trim();
-        // Clean up trailing whitespace and common noise
-        val = val.replace(/\s+/g, ' ').replace(/[,.\s]+$/, '');
-        if (val.length > 3 && !falsePositives.includes(val.toUpperCase())) {
-          return val;
-        }
-      }
+    // 2. Look for company names that END with trucking/transport keywords (these are company names, not sentences)
+    const m2 = t.match(/\b([A-Z][A-Z0-9\s&.'-]+\s+(?:TRUCKING|TRANSPORT|FREIGHT|LOGISTICS|CARRIERS?|FORWARDING)\s*(?:INC|LLC|SA|CORP|CO|DE CV)?)\b/);
+    if (m2) {
+      const val = m2[1].trim().replace(/\s+/g, ' ');
+      if (val.length > 5 && val.length < 60) return val;
     }
+
+    // 3. Label on its own line: "Transportista: COMPANY" or "Carrier: COMPANY"
+    const m3 = t.match(/(?:^|\n)\s*(?:transportista|carrier|fletera|linea de transporte)\s*[:\-]\s*([A-Z][A-Z0-9\s&.'-]{3,})/im);
+    if (m3) return m3[1].trim().replace(/\s+/g, ' ').replace(/[,.\s]+$/, '');
+
     return null;
   },
 
