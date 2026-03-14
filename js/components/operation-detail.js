@@ -4,6 +4,32 @@
 
 const OperationDetail = {
 
+  // Only show relevant document types
+  isRelevantAttachment(filename) {
+    const f = filename.toLowerCase();
+    const keywords = ['invoice', 'inv', 'bol', 'lading', 'manifest', 'shipping', 'proforma', 'doda', 'shipper', 'rpt040', 'rpt020', 'factura'];
+    return keywords.some(kw => f.includes(kw));
+  },
+
+  renderAttachments(attachments) {
+    if (!attachments || !attachments.length) return '';
+    const filtered = attachments.filter(att => this.isRelevantAttachment(att.filename));
+    if (!filtered.length) return '';
+    return `
+      <div class="panel">
+        <div class="panel-title">Archivos adjuntos (${filtered.length})</div>
+        ${filtered.map(att => `
+          <div class="doc-item">
+            <div class="doc-icon yes">${this.fileIcon(att.filename)}</div>
+            <span class="doc-name">${att.filename}</span>
+            <button class="btn-icon" onclick="Gmail.downloadAttachment('${att.messageId}','${att.attachmentId}','${att.filename.replace(/'/g, "\\'")}')" title="Descargar">
+              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+            </button>
+          </div>
+        `).join('')}
+      </div>`;
+  },
+
   fileIcon(filename) {
     const ext = (filename || '').split('.').pop().toLowerCase();
     if (['pdf'].includes(ext)) return 'PDF';
@@ -60,60 +86,34 @@ const OperationDetail = {
       </div>
     `).join('');
 
-    // Parties (solo proveedor y transportista)
-    const partyOrder = ['proveedor', 'transportista'];
-    const partyLabels = { proveedor: 'Proveedor', transportista: 'Transportista' };
-    const allParties = { ...op.parties };
-
-    const partiesHtml = partyOrder.map(p => `
-      <div class="party-item">
-        <span class="party-role ${p}">${partyLabels[p]}</span>
-        <span class="party-name">${allParties[p] || '—'}</span>
-      </div>
-    `).join('');
 
     // Operation info
     const d = op.opData || {};
+    const allParties = { ...op.parties };
     const infoHtml = `
       <div class="info-row">
-        <span class="info-label">Caja</span>
+        <span class="info-label">Proveedor</span>
+        <span class="info-value">${allParties.proveedor || '—'}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Transportista</span>
+        <span class="info-value">${allParties.transportista || '—'}</span>
+      </div>
+      <div class="info-row">
+        <span class="info-label">Caja / Econ.</span>
         <span class="info-value">${op.caja}</span>
       </div>
-      ${op.facturas.length ? `<div class="info-row">
-        <span class="info-label">Factura</span>
-        <span class="info-value">${op.facturas.join(', ')}</span>
-      </div>` : ''}
-      ${op.pedimentos.length ? `<div class="info-row">
-        <span class="info-label">Pedimento</span>
-        <span class="info-value">${op.pedimentos.join(', ')}</span>
-      </div>` : ''}
-      ${d.po ? `<div class="info-row">
-        <span class="info-label">PO</span>
-        <span class="info-value">${d.po}</span>
-      </div>` : ''}
+      <div class="info-row">
+        <span class="info-label">Invoice</span>
+        <span class="info-value">${op.facturas.length ? op.facturas.join(', ') : '—'}</span>
+      </div>
       ${d.bol ? `<div class="info-row">
         <span class="info-label">BOL</span>
         <span class="info-value">${d.bol}</span>
       </div>` : ''}
-      ${d.arrive ? `<div class="info-row">
-        <span class="info-label">Arrive #</span>
-        <span class="info-value">${d.arrive}</span>
-      </div>` : ''}
-      ${d.placas ? `<div class="info-row">
-        <span class="info-label">Placas</span>
-        <span class="info-value">${d.placas}</span>
-      </div>` : ''}
-      ${d.scac ? `<div class="info-row">
-        <span class="info-label">SCAC</span>
-        <span class="info-value">${d.scac}</span>
-      </div>` : ''}
       <div class="info-row">
         <span class="info-label">Status</span>
         <span class="info-value">${Parser.getStatusLabel(op.status)}</span>
-      </div>
-      <div class="info-row">
-        <span class="info-label">Correos</span>
-        <span class="info-value">${op.emailCount}</span>
       </div>
     `;
 
@@ -182,23 +182,7 @@ const OperationDetail = {
             <div class="panel-title">Documentos</div>
             ${docsHtml}
           </div>
-          <div class="panel" style="margin-bottom:10px">
-            <div class="panel-title">Partes</div>
-            ${partiesHtml}
-          </div>
-          ${op.attachments && op.attachments.length ? `
-          <div class="panel">
-            <div class="panel-title">Archivos adjuntos (${op.attachments.length})</div>
-            ${op.attachments.map((att, idx) => `
-              <div class="doc-item">
-                <div class="doc-icon yes">${this.fileIcon(att.filename)}</div>
-                <span class="doc-name">${att.filename}</span>
-                <button class="btn-icon" onclick="Gmail.downloadAttachment('${att.messageId}','${att.attachmentId}','${att.filename.replace(/'/g, "\\'")}')" title="Descargar">
-                  <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-                </button>
-              </div>
-            `).join('')}
-          </div>` : ''}
+          ${this.renderAttachments(op.attachments)}
         </div>
         <div class="panel">
           <div class="panel-title">Log de correos (${op.emails.length})</div>
