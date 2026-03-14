@@ -38,7 +38,7 @@ const OperationDetail = {
       { name: 'Bill of Lading',       found: stageReached('proforma') || /rpt040|lading/i.test(allText),   date: stageDate('docs_proveedor') },
       { name: 'Shipping Manifest',    found: stageReached('proforma') || /rpt020|manifest/i.test(allText), date: stageDate('docs_proveedor') },
       { name: 'Invoice comercial',    found: stageReached('proforma') || /invoice|26NI/i.test(allText),    date: stageDate('docs_proveedor') },
-      { name: 'Pedimento',            found: stageReached('mve') || /pedimento/i.test(allText),            date: stageDate('mve') },
+      { name: 'Proforma',             found: stageReached('proforma') || /proforma|pedimento/i.test(allText), date: stageDate('proforma') },
       { name: 'DODA',                 found: stageReached('doda') || /\bdoda\b/i.test(allText),            date: stageDate('doda') },
     ];
 
