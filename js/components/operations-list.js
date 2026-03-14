@@ -69,12 +69,14 @@ const OperationsList = {
 
     const statusClass = op.status === 'despachado' ? 'done' :
                          op.status === 'bodega' ? 'attn' : 'prog';
+    const cajaLine = op.cajas.length ? `<span style="color:var(--text3);font-size:11px">Caja: ${op.cajas.join(', ')}</span>` : '';
 
-    return `<div class="op-card" data-caja="${op.caja}" data-status="${op.status}">
+    return `<div class="op-card" data-id="${op.id}" data-status="${op.status}">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-        <div class="op-ref">${op.caja}</div>
+        <div class="op-ref">${op.displayRef}</div>
         <div class="status-dot ${statusClass}"></div>
       </div>
+      ${cajaLine}
       <div class="op-stage">${stageLabel} · ${Parser.getStatusLabel(op.status)}</div>
       <div class="mini-track">${dots}</div>
       <div class="op-foot">
@@ -94,8 +96,8 @@ const OperationsList = {
     // Card clicks
     document.querySelectorAll('#operations-list-view .op-card').forEach(card => {
       card.addEventListener('click', () => {
-        const caja = card.dataset.caja;
-        const op = ops.find(o => o.caja === caja);
+        const id = card.dataset.id;
+        const op = ops.find(o => o.id === id);
         if (op) OperationDetail.render(op);
       });
     });

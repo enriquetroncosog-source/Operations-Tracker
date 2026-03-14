@@ -220,11 +220,10 @@ const Parser = {
     return d.toLocaleDateString('es-MX', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
   },
 
-  // Group raw messages into operation objects
+  // Group raw messages into operation objects (keyed by invoice/factura)
   groupByOperation(messages) {
-    const groups = {};
-
-    messages.forEach(msg => {
+    // Step 1: Parse all messages
+    const parsed = messages.map(msg => {
       const subject = Gmail.getHeader(msg, 'Subject');
       const from = Gmail.getHeader(msg, 'From');
       const date = this.parseDate(Gmail.getHeader(msg, 'Date'));
@@ -244,45 +243,89 @@ const Parser = {
       const opData = this.extractOperationData(fullText);
       const summary = this.summarize(stage, subject);
       const attachments = Gmail.extractAttachments(msg);
-      // Try to extract factura from attachment filenames
       const facturaFromAtt = this.extractFacturaFromAttachments(attachments);
+      const effectiveFactura = factura || facturaFromAtt || null;
 
-      const keys = cajas.length ? cajas : ['_sin_caja'];
-
-      keys.forEach(key => {
-        if (!groups[key]) {
-          groups[key] = {
-            caja: key, emails: [], stages: new Set(),
-            parties: {}, pedimentos: new Set(), facturas: new Set(),
-            opData: {}, attachments: []
-          };
-        }
-        groups[key].emails.push({ subject, from, fromName: name, date, stage, party, pedimento, factura, summary });
-        groups[key].stages.add(stage);
-        if (!groups[key].parties[party]) groups[key].parties[party] = name;
-        if (proveedor && !groups[key].parties.proveedor) groups[key].parties.proveedor = proveedor;
-        if (transportista && !groups[key].parties.transportista) groups[key].parties.transportista = transportista;
-        if (pedimento) groups[key].pedimentos.add(pedimento);
-        if (factura) groups[key].facturas.add(factura);
-        if (facturaFromAtt && !factura) groups[key].facturas.add(facturaFromAtt);
-        // Merge operation data
-        Object.assign(groups[key].opData, opData);
-        // Collect attachments
-        if (attachments.length) groups[key].attachments.push(...attachments);
-      });
+      return { subject, from, fromName: name, date, stage, party, cajas, pedimento,
+        factura: effectiveFactura, proveedor, transportista, opData, summary, attachments };
     });
 
+    // Step 2: Build a map of caja -> factura (from messages that have both)
+    const cajaToFactura = {};
+    for (const p of parsed) {
+      if (p.factura) {
+        for (const c of p.cajas) {
+          if (!cajaToFactura[c]) cajaToFactura[c] = new Set();
+          cajaToFactura[c].add(p.factura);
+        }
+      }
+    }
+
+    // Step 3: Group by factura
+    const groups = {};
+    const addToGroup = (key, p) => {
+      if (!groups[key]) {
+        groups[key] = {
+          invoice: key, cajas: new Set(), emails: [], stages: new Set(),
+          parties: {}, pedimentos: new Set(), facturas: new Set(),
+          opData: {}, attachments: []
+        };
+      }
+      const g = groups[key];
+      g.emails.push({ subject: p.subject, from: p.from, fromName: p.fromName, date: p.date,
+        stage: p.stage, party: p.party, pedimento: p.pedimento, factura: p.factura, summary: p.summary });
+      g.stages.add(p.stage);
+      for (const c of p.cajas) g.cajas.add(c);
+      if (!g.parties[p.party]) g.parties[p.party] = p.fromName;
+      if (p.proveedor && !g.parties.proveedor) g.parties.proveedor = p.proveedor;
+      if (p.transportista && !g.parties.transportista) g.parties.transportista = p.transportista;
+      if (p.pedimento) g.pedimentos.add(p.pedimento);
+      if (p.factura) g.facturas.add(p.factura);
+      Object.assign(g.opData, p.opData);
+      if (p.attachments.length) g.attachments.push(...p.attachments);
+    };
+
+    for (const p of parsed) {
+      if (p.factura) {
+        // Has factura -> use it as key
+        addToGroup(p.factura, p);
+      } else {
+        // No factura -> try to find one via shared caja
+        let assigned = false;
+        for (const c of p.cajas) {
+          const facturas = cajaToFactura[c];
+          if (facturas && facturas.size === 1) {
+            addToGroup([...facturas][0], p);
+            assigned = true;
+            break;
+          }
+        }
+        if (!assigned && p.cajas.length) {
+          // Fallback: use caja as key with _caja prefix
+          addToGroup('_caja_' + p.cajas[0], p);
+        }
+        // Skip messages with no factura and no caja
+      }
+    }
+
     return Object.values(groups)
-      .filter(g => g.caja !== '_sin_caja' && g.emails.length > 0)
+      .filter(g => g.emails.length > 0)
       .map(g => {
         const sortedEmails = g.emails.sort((a, b) => b.date - a.date);
         const highestStage = Math.max(...g.emails.map(e => STAGE_IDX[e.stage] ?? 0));
         const currentStageId = STAGES[highestStage]?.id || 'docs_proveedor';
+        const cajas = [...(g.cajas || [])];
         const pedimentos = [...(g.pedimentos || [])];
         const facturas = [...(g.facturas || [])];
+        const isInvoiceKey = !g.invoice.startsWith('_caja_');
+        const displayRef = isInvoiceKey ? g.invoice : g.invoice.replace('_caja_', '');
 
         return {
-          caja: g.caja,
+          id: g.invoice,
+          invoice: isInvoiceKey ? g.invoice : null,
+          caja: cajas[0] || (isInvoiceKey ? '' : displayRef),
+          cajas,
+          displayRef,
           currentStage: currentStageId,
           currentStageIdx: highestStage,
           lastUpdate: sortedEmails[0]?.date,

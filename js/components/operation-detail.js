@@ -128,7 +128,7 @@ const OperationDetail = {
       </div>
       <div class="info-row">
         <span class="info-label">Caja / Econ.</span>
-        <span class="info-value">${op.caja}</span>
+        <span class="info-value">${op.cajas.length ? op.cajas.join(', ') : '—'}</span>
       </div>
       <div class="info-row">
         <span class="info-label">Invoice</span>
@@ -183,10 +183,10 @@ const OperationDetail = {
 
       <div class="detail-header">
         <div>
-          <div class="detail-ref">Caja ${op.caja}</div>
+          <div class="detail-ref">${op.invoice ? op.invoice : 'Caja ' + op.displayRef}</div>
           <div class="detail-sub">
+            ${op.cajas.length ? `<span>Caja: ${op.cajas.join(', ')}</span>` : ''}
             ${op.pedimentos.length ? `<span>Ped: ${op.pedimentos.join(', ')}</span>` : ''}
-            ${op.facturas.length ? `<span>Fac: ${op.facturas.join(', ')}</span>` : ''}
             <span>${lu}</span>
             <span>${op.emailCount} correos</span>
           </div>

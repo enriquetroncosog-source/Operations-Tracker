@@ -69,10 +69,10 @@ const SearchComponent = {
       if (term) {
         const valClean = term.toUpperCase().trim();
         const mainOp = ops.find(o =>
-          o.caja === valClean ||
-          o.caja.replace('/', '') === valClean ||
+          o.cajas.some(c => c === valClean || c.replace('/', '') === valClean) ||
           o.pedimentos.includes(valClean) ||
-          o.facturas.includes(valClean)
+          o.facturas.includes(valClean) ||
+          (o.invoice && o.invoice === valClean)
         );
 
         if (mainOp && ops.length <= 3) {

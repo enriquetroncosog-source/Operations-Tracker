@@ -82,10 +82,12 @@ const DashboardComponent = {
     const dotCls = op.status === 'despachado' ? 'done' : 'prog';
     const dateStr = Parser.fmtDate(op.lastUpdate);
     const stageLabel = STAGES[si]?.label || '—';
+    const cajaLine = op.cajas.length ? `<div class="op-meta" style="margin-top:2px"><span>Caja: ${op.cajas.join(', ')}</span></div>` : '';
 
-    return `<div class="op-card" data-caja="${op.caja}">
-      <div class="op-ref">${op.caja}</div>
+    return `<div class="op-card" data-id="${op.id}">
+      <div class="op-ref">${op.displayRef}</div>
       <div class="op-stage">${stageLabel}</div>
+      ${cajaLine}
       <div class="mini-track">${dots}</div>
       <div class="op-foot">
         <div class="op-meta">
@@ -100,8 +102,8 @@ const DashboardComponent = {
   bindCardEvents(ops) {
     document.querySelectorAll('.op-card').forEach(card => {
       card.addEventListener('click', () => {
-        const caja = card.dataset.caja;
-        const op = ops.find(o => o.caja === caja);
+        const id = card.dataset.id;
+        const op = ops.find(o => o.id === id);
         if (op) OperationDetail.render(op);
       });
     });
