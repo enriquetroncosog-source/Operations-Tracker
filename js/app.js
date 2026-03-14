@@ -28,6 +28,7 @@ const App = {
   // Load operations from localStorage and render
   loadOperations() {
     const ops = Store.getAll();
+    console.log('[App] Store has', ops.length, 'operations');
     if (!ops.length) {
       DashboardComponent.showWelcome();
       return;
@@ -42,8 +43,11 @@ const App = {
   async enrichAll(ops) {
     let updated = false;
     for (const op of ops) {
-      // Skip if enriched recently (last 30 min)
-      if (op.lastEnriched && (Date.now() - new Date(op.lastEnriched).getTime()) < 30 * 60 * 1000) continue;
+      // Skip if enriched recently (last 5 min)
+      if (op.lastEnriched && (Date.now() - new Date(op.lastEnriched).getTime()) < 5 * 60 * 1000) {
+        console.log('[Enrich] Skipping', op.invoice || op.caja, '(enriched', Math.round((Date.now() - new Date(op.lastEnriched).getTime()) / 1000), 's ago)');
+        continue;
+      }
       try {
         await this.enrichOne(op);
         updated = true;
