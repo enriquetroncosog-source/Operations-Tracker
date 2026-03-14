@@ -199,7 +199,15 @@ const App = {
     op.caja = (data.caja || '').trim().toUpperCase();
     op.proveedor = (data.proveedor || '').trim();
     op.transportista = (data.transportista || '').trim();
-    op.lastEnriched = null; // Force re-enrich
+    // Reset enrichment data so it re-calculates fresh
+    op.lastEnriched = null;
+    op.emails = [];
+    op.currentStage = 'docs_proveedor';
+    op.currentStageIdx = 0;
+    op.status = 'en_proceso';
+    op.attachments = [];
+    op.pedimentos = [];
+    op.opData = {};
     Store.save(op);
     DashboardComponent.showLoading('Actualizando...');
     try {
