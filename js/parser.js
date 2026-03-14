@@ -90,6 +90,8 @@ const Parser = {
     for (const att of (attachments || [])) {
       const f = (att.filename || '').toLowerCase();
       if (/pedimento|proforma/i.test(f)) return 'proforma';
+      // Pattern: "6000449 CAJA W35628.pdf" = pedimento file
+      if (/\d{5,}\s*caja\s/i.test(f)) return 'proforma';
       if (/\bmve\b|manifestaci/i.test(f)) return 'mve';
       if (/\bdoda\b/i.test(f)) return 'doda';
     }

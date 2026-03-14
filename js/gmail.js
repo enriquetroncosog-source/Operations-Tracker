@@ -61,6 +61,26 @@ const Gmail = {
     return attachments;
   },
 
+  // Peek at attachment content (returns decoded text for analysis)
+  async peekAttachment(messageId, attachmentId) {
+    try {
+      const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`;
+      const r = await fetch(url, {
+        headers: { Authorization: 'Bearer ' + Auth.getToken() }
+      });
+      const data = await r.json();
+      if (data.data) {
+        // Decode base64url and extract readable text (first ~2000 chars)
+        const b64 = data.data.replace(/-/g, '+').replace(/_/g, '/');
+        const raw = atob(b64.substring(0, 8000)); // Only decode first chunk
+        return raw;
+      }
+    } catch (e) {
+      console.log('[Gmail] peekAttachment error:', e.message);
+    }
+    return '';
+  },
+
   // Download an attachment
   async downloadAttachment(messageId, attachmentId, filename) {
     const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`;

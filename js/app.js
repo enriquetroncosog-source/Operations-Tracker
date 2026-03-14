@@ -123,6 +123,18 @@ const App = {
         const attStage = Parser.detectStageFromAttachments(msgAttachments);
         if (attStage) stage = attStage;
       }
+      // If still docs_proveedor, peek inside PDF attachments for "PEDIMENTO"
+      if (stage === 'docs_proveedor') {
+        for (const att of msgAttachments) {
+          if ((att.mimeType || '').includes('pdf') && att.attachmentId) {
+            const raw = await Gmail.peekAttachment(msg.id, att.attachmentId);
+            if (/PEDIMENTO/i.test(raw) || /NUM\.?\s*PEDIMENTO/i.test(raw)) {
+              stage = 'proforma';
+              break;
+            }
+          }
+        }
+      }
       const party = Parser.detectParty(from);
       const stageIdx = STAGE_IDX[stage] ?? 0;
       if (stageIdx > highestStage) highestStage = stageIdx;
