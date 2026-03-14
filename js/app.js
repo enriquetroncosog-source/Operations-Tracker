@@ -7,15 +7,17 @@ const App = {
 
   init() {
     LoginComponent.render();
+    // Pre-initialize GSI when library loads (no token request yet)
     const waitGSI = setInterval(() => {
       if (typeof google !== 'undefined' && google.accounts) {
         clearInterval(waitGSI);
-        Auth.initGSI(() => this.onAuthSuccess());
+        Auth.initGSI();
       }
     }, 200);
   },
 
   onAuthSuccess() {
+    console.log('[App] Auth success, token:', Auth.getToken() ? 'YES' : 'NO');
     LoginComponent.hide();
     document.getElementById('app').classList.add('visible');
     DashboardComponent.renderHeader();
@@ -71,8 +73,22 @@ const App = {
     const result = await Gmail.list(query, 40);
     console.log('[Enrich] Gmail result:', JSON.stringify(result).substring(0, 500));
     if (result.error) {
-      console.error('[Enrich] Gmail API error:', result.error.message || result.error);
-      return;
+      console.error('[Enrich] Gmail API error:', result.error.code, result.error.message || result.error);
+      if (result.error.code === 401) {
+        console.log('[Enrich] Token expired, requesting fresh token...');
+        try {
+          await Auth.refreshToken();
+          // Retry once with new token
+          const retry = await Gmail.list(query, 40);
+          if (retry.error || !retry.messages) return;
+          result.messages = retry.messages;
+        } catch (e) {
+          console.error('[Enrich] Token refresh failed:', e);
+          return;
+        }
+      } else {
+        return;
+      }
     }
     const msgIds = (result.messages || []).map(m => m.id);
     if (!msgIds.length) {
