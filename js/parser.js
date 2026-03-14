@@ -39,10 +39,14 @@ const Parser = {
 
   extractCajas(text) {
     const matches = [];
+    const falsePositives = ['CORRECTA','PLACAS','PLACA','GRANDE','CHICA','VACIA','LLENA',
+      'NUEVA','BUENA','MALA','PARA','COMO','ESTA','ESTE','TIENE','SERA','PUEDEN',
+      'FAVOR','ENVIAR','CORRESPONDIENTE','NUMERO','DATOS','DOCUMENTO','INFORMACION'];
     const re1 = /caja[:\s\/\s#]+([A-Z0-9]{3,10})/gi;
     let m;
     while ((m = re1.exec(text)) !== null) {
-      matches.push(m[1].toUpperCase().replace(/\/$/, ''));
+      const val = m[1].toUpperCase().replace(/\/$/, '');
+      if (!falsePositives.includes(val)) matches.push(val);
     }
     const re2 = /\b([A-Z]\d{4,7})\b/gi;
     while ((m = re2.exec(text)) !== null) {
