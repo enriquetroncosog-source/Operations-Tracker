@@ -70,11 +70,9 @@ const Parser = {
 
     if (/factura.*honorar|honorarios|facturaci/i.test(s)) return 'despachado';
     if (
-      /despacha[d]?[ao]?|d[e3]sp[a4]ch[a4]d[ao]|despa[cks]h|despach[aeio]/i.test(s) ||
-      /d.sp.ch.d/i.test(s) ||
-      this.isSimilar(s, 'despachado') ||
-      this.isSimilar(s, 'despachada') ||
-      /liberado|libre|salida.*aduana|fwd:.*despacho/i.test(s)
+      /\bdespachad[ao]\b/i.test(s) ||
+      /\bd[e3]sp[a4]ch[a4]d[ao]\b/i.test(s) ||
+      /liberado|libre|salida.*aduana/i.test(s)
     ) return 'despachado';
 
     if (/\bdoda\b|doda.*enviad/i.test(s)) return 'doda';
