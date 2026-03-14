@@ -166,6 +166,7 @@ const OperationDetail = {
         <div style="display:flex;align-items:center;gap:8px">
           <button class="btn-secondary btn-sm" id="detail-edit">Editar</button>
           <button class="btn-secondary btn-sm btn-danger" id="detail-delete">Eliminar</button>
+          ${op.status !== 'despachado' ? `<button class="btn-primary btn-sm" id="detail-despachar" style="background:var(--success)">Marcar Despachado</button>` : ''}
           <span class="status-pill ${statusPillClass}">${statusPillText}</span>
         </div>
       </div>
@@ -201,6 +202,75 @@ const OperationDetail = {
     document.getElementById('detail-delete').addEventListener('click', () => {
       if (confirm('¿Eliminar esta operación?')) {
         App.deleteOperation(op.id);
+      }
+    });
+
+    const btnDespachar = document.getElementById('detail-despachar');
+    if (btnDespachar) {
+      btnDespachar.addEventListener('click', () => {
+        this.showDespachoModal(op);
+      });
+    }
+  },
+
+  showDespachoModal(op) {
+    const modal = document.getElementById('config-modal');
+    const ref = op.invoice || op.caja || '';
+    const cajaInfo = op.caja ? `Caja: ${op.caja}` : '';
+    const defaultTo = 'whsesd@core-logistics.com, tj@logisticostroncoso.com';
+    const defaultSubject = `DESPACHO CECSO ${op.caja || ''} - ${op.invoice || ''}`.trim();
+    const defaultBody = `Se confirma el despacho de la siguiente operación:\n\nInvoice: ${op.invoice || '—'}\nCaja: ${op.caja || '—'}\nProveedor: ${op.proveedor || '—'}\nTransportista: ${op.transportista || '—'}\n${op.opData?.bol ? 'BOL: ' + op.opData.bol + '\n' : ''}\nSaludos.`;
+
+    modal.innerHTML = `
+      <div class="modal">
+        <h3>Marcar como Despachado</h3>
+        <p>Se enviar&aacute; un correo de confirmaci&oacute;n de despacho.</p>
+        <label class="form-label">Para (destinatarios)</label>
+        <input type="text" id="desp-to" value="${defaultTo}" />
+        <label class="form-label">Asunto</label>
+        <input type="text" id="desp-subject" value="${defaultSubject}" />
+        <label class="form-label">Mensaje</label>
+        <textarea id="desp-body" style="width:100%;min-height:120px;background:var(--surface2);border:1px solid var(--border2);border-radius:8px;padding:10px 12px;color:var(--text);font-family:var(--font);font-size:13px;outline:none;resize:vertical">${defaultBody}</textarea>
+        <div class="modal-footer">
+          <button class="btn-secondary" id="desp-cancel">Cancelar</button>
+          <button class="btn-primary" id="desp-send" style="background:var(--success)">Enviar y Despachar</button>
+        </div>
+      </div>
+    `;
+    modal.style.display = 'flex';
+
+    document.getElementById('desp-cancel').addEventListener('click', () => {
+      modal.style.display = 'none';
+    });
+
+    document.getElementById('desp-send').addEventListener('click', async () => {
+      const to = document.getElementById('desp-to').value.trim();
+      const subject = document.getElementById('desp-subject').value.trim();
+      const body = document.getElementById('desp-body').value.trim();
+
+      if (!to) { alert('Ingresa al menos un destinatario.'); return; }
+
+      const btn = document.getElementById('desp-send');
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      try {
+        const result = await Gmail.sendEmail(to, subject, body);
+        if (result.error) {
+          alert('Error al enviar: ' + (result.error.message || result.error));
+          btn.disabled = false;
+          btn.textContent = 'Enviar y Despachar';
+          return;
+        }
+
+        // Update operation status
+        App.markAsDespatched(op.id);
+        modal.style.display = 'none';
+        alert('Correo enviado. Operación marcada como despachada.');
+      } catch (e) {
+        alert('Error: ' + e.message);
+        btn.disabled = false;
+        btn.textContent = 'Enviar y Despachar';
       }
     });
   }

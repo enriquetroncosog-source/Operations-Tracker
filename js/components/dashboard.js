@@ -187,6 +187,17 @@ const DashboardComponent = {
         alert('Ingresa al menos el invoice o la caja.');
         return;
       }
+      // Check for duplicate invoice
+      if (data.invoice) {
+        const invClean = data.invoice.trim().toUpperCase();
+        const existing = Store.getAll().find(o =>
+          o.invoice === invClean && (!isEdit || o.id !== editOp?.id)
+        );
+        if (existing) {
+          alert('Ya existe una operaci\u00f3n con el invoice ' + invClean);
+          return;
+        }
+      }
       modal.style.display = 'none';
       if (isEdit) {
         App.editOperation(editOp.id, data);

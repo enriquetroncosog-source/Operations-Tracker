@@ -197,5 +197,29 @@ const Gmail = {
 
     if (!billIds.length) return [];
     return this.fetchMessages(billIds);
+  },
+
+  // Send an email
+  async sendEmail(to, subject, body) {
+    const raw = [
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'Content-Type: text/plain; charset=UTF-8',
+      '',
+      body
+    ].join('\r\n');
+
+    const encoded = btoa(unescape(encodeURIComponent(raw)))
+      .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+    const r = await fetch('https://gmail.googleapis.com/gmail/v1/users/me/messages/send', {
+      method: 'POST',
+      headers: {
+        Authorization: 'Bearer ' + Auth.getToken(),
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ raw: encoded })
+    });
+    return r.json();
   }
 };

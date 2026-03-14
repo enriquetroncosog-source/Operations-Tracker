@@ -248,6 +248,21 @@ const App = {
     Router.navigate('dashboard');
   },
 
+  // Mark operation as dispatched
+  markAsDespatched(id) {
+    const op = Store.getById(id);
+    if (!op) return;
+    op.currentStage = 'despachado';
+    op.currentStageIdx = STAGE_IDX['despachado'];
+    op.status = 'despachado';
+    op.lastUpdate = new Date().toISOString();
+    Store.save(op);
+    this.allOps = Store.getAll();
+    // Re-render detail with updated data
+    const displayOp = this.toDisplayOps([op])[0];
+    OperationDetail.render(displayOp);
+  },
+
   logout() {
     Auth.logout();
     this.allOps = [];

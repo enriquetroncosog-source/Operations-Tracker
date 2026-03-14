@@ -4,7 +4,7 @@
 
 const CONFIG = {
   CLIENT_ID: '659571303958-ak8jq5qc9v5h9hh4770l7mubbm5alfer.apps.googleusercontent.com',
-  SCOPES: 'https://www.googleapis.com/auth/gmail.readonly email',
+  SCOPES: 'https://www.googleapis.com/auth/gmail.readonly https://www.googleapis.com/auth/gmail.send email',
   CECSO_KEYWORDS: ['cecso', 'CECSO', '544437'],
 };
 

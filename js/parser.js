@@ -69,13 +69,7 @@ const Parser = {
     const subj = subject.toLowerCase();
     const s = (subject + ' ' + from + ' ' + snippet).toLowerCase();
 
-    // "despachado" or "despachada" = dispatched
-    if (/factura.*honorar|honorarios|facturaci/i.test(s)) return 'despachado';
-    if (
-      /\bdespachad[ao]\b/i.test(s) ||
-      /\bd[e3]sp[a4]ch[a4]d[ao]\b/i.test(s) ||
-      /liberado|libre|salida.*aduana/i.test(s)
-    ) return 'despachado';
+    // "despachado" stage is now manual only - no auto-detection
 
     // "despacho" in subject (not "despachado") = DODA stage
     if (/\bdespacho\b/i.test(subj)) return 'doda';
