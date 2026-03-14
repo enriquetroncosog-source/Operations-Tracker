@@ -99,17 +99,29 @@ const Parser = {
 
   // Extract transportista from text
   extractTransportista(text) {
-    // Pattern: "Transfer Carrier\nCOMPANY NAME" or "Carrier:\nNAME"
+    // Normalize whitespace: replace all types of line breaks and multiple spaces
+    const t = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+
     const patterns = [
-      /Transfer\s+Carrier\s*\n\s*([A-Z][A-Z\s&.,]+(?:INC|LLC|SA|CORP)?)/i,
-      /(?:transportista|carrier|trucker|fletera)[:\s]*\n?\s*([A-Z][A-Z\s&.,]{3,}(?:INC|LLC|SA|CORP)?)/i,
-      /(?:transportista|carrier|trucker|fletera)[:\s]+([^,\n|]{3,})/i,
+      // "Transfer Carrier\nINTRANSPORT TRUCKING INC"
+      /Transfer\s+Carrier[\s\n:]+([A-Z][A-Z0-9\s&.,'-]+(?:INC|LLC|SA|CORP|CO)?)/i,
+      // "Carrier\nNAME" or "Carrier: NAME"
+      /(?:carrier|transporte|transportista|freight|trucker|fletera|linea\s+de\s+transporte)[\s\n:]+([A-Z][A-Z0-9\s&.,'-]{3,})/i,
+      // Look for known trucking company patterns (ends with INC, LLC, TRUCKING, TRANSPORT, FREIGHT, LOGISTICS)
+      /\b([A-Z][A-Z0-9\s&.,'-]*(?:TRUCKING|TRANSPORT|FREIGHT|LOGISTICS|CARRIERS?)\s*(?:INC|LLC|SA|CORP|CO)?)\b/i,
     ];
+
+    const falsePositives = ['SCAC', 'CAAT', 'TRANSFER', 'CARRIER'];
+
     for (const re of patterns) {
-      const m = text.match(re);
+      const m = t.match(re);
       if (m) {
-        const val = m[1].trim();
-        if (val.length > 2 && !/^SCAC$/i.test(val)) return val;
+        let val = m[1] ? m[1].trim() : m[0].trim();
+        // Clean up trailing whitespace and common noise
+        val = val.replace(/\s+/g, ' ').replace(/[,.\s]+$/, '');
+        if (val.length > 3 && !falsePositives.includes(val.toUpperCase())) {
+          return val;
+        }
       }
     }
     return null;
@@ -190,7 +202,7 @@ const Parser = {
       const pedimento = this.extractPedimento(fullText);
       const factura = this.extractFactura(fullText);
       const proveedor = this.extractProveedor(subject);
-      const transportista = this.extractTransportista(bodyText) || this.extractTransportista(snippet);
+      const transportista = this.extractTransportista(bodyText) || this.extractTransportista(snippet) || this.extractTransportista(fullText);
       const opData = this.extractOperationData(fullText);
       const summary = this.summarize(stage, subject);
       const attachments = Gmail.extractAttachments(msg);

@@ -91,7 +91,7 @@ const Gmail = {
       const walk = (parts) => {
         for (const part of (parts || [])) {
           if (part?.mimeType === 'text/plain' && part?.body?.data) {
-            return atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')).substring(0, 800);
+            return atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')).substring(0, 2000);
           }
           if (part?.parts) {
             const found = walk(part.parts);
@@ -103,7 +103,7 @@ const Gmail = {
       const fromParts = walk(msg.payload?.parts || []);
       if (fromParts) return fromParts;
       if (msg.payload?.body?.data) {
-        return atob(msg.payload.body.data.replace(/-/g, '+').replace(/_/g, '/')).substring(0, 800);
+        return atob(msg.payload.body.data.replace(/-/g, '+').replace(/_/g, '/')).substring(0, 2000);
       }
     } catch (e) {
       console.log('[Gmail] body extract error:', e.message);
