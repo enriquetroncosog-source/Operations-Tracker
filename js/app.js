@@ -58,10 +58,19 @@ const App = {
   // Enrich a single operation with Gmail emails
   async enrichOne(op) {
     const terms = [op.invoice, op.caja].filter(Boolean);
-    if (!terms.length) return;
+    if (!terms.length) { console.log('[Enrich] No terms for', op.id); return; }
 
-    const query = terms.map(t => `"${t}"`).join(' OR ');
+    // Search with multiple query strategies
+    const query = terms.join(' OR ');
+    console.log('[Enrich] Query:', query);
     const result = await Gmail.list(query, 40);
+    console.log('[Enrich] Gmail result:', JSON.stringify(result).substring(0, 300));
+    if (result.error) {
+      console.error('[Enrich] Gmail error:', result.error);
+      // Token may have expired, try to refresh
+      if (result.error.code === 401) Auth.requestToken();
+      return;
+    }
     const msgIds = (result.messages || []).map(m => m.id);
     if (!msgIds.length) {
       op.lastEnriched = new Date().toISOString();
@@ -150,10 +159,12 @@ const App = {
     DashboardComponent.showLoading('Buscando correos relacionados...');
     try {
       await this.enrichOne(op);
+      console.log('[App] Enriched op:', JSON.stringify(op).substring(0, 500));
     } catch (e) {
-      console.log('[App] Initial enrich failed:', e.message);
+      console.error('[App] Initial enrich failed:', e);
     }
     this.allOps = Store.getAll();
+    console.log('[App] Rendering', this.allOps.length, 'ops, first has', this.allOps[0]?.emails?.length, 'emails');
     DashboardComponent.renderWithOps(this.toDisplayOps(this.allOps));
   },
 
