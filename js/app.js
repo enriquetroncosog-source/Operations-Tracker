@@ -61,14 +61,17 @@ const App = {
     if (!terms.length) { console.log('[Enrich] No terms for', op.id); return; }
 
     // Search with multiple query strategies
+    if (!Auth.getToken()) {
+      console.warn('[Enrich] No auth token available');
+      return;
+    }
+
     const query = terms.join(' OR ');
     console.log('[Enrich] Query:', query);
     const result = await Gmail.list(query, 40);
-    console.log('[Enrich] Gmail result:', JSON.stringify(result).substring(0, 300));
+    console.log('[Enrich] Gmail result:', JSON.stringify(result).substring(0, 500));
     if (result.error) {
-      console.error('[Enrich] Gmail error:', result.error);
-      // Token may have expired, try to refresh
-      if (result.error.code === 401) Auth.requestToken();
+      console.error('[Enrich] Gmail API error:', result.error.message || result.error);
       return;
     }
     const msgIds = (result.messages || []).map(m => m.id);
