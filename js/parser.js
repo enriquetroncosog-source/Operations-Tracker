@@ -52,8 +52,6 @@ const Parser = {
 
     if (/\bdoda\b|doda.*enviad/i.test(s)) return 'doda';
     if (/\bmve\b|solicitud.*mve|mva/i.test(s)) return 'mve';
-    if (/\bcove\b|pedimento|pago.*impuesto|manifestaci/i.test(s)) return 'docs_despacho';
-    if (/clasificac|fraccion|tarifa|hts/i.test(s)) return 'clasificacion';
     if (/proforma|cotizaci/i.test(s)) return 'proforma';
     return 'docs_proveedor';
   },

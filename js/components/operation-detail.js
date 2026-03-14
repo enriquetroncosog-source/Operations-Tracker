@@ -35,13 +35,12 @@ const OperationDetail = {
     };
 
     const docs = [
-      { name: 'Bill of Lading',       found: stageReached('clasificacion') || /rpt040|lading/i.test(allText),   date: stageDate('docs_proveedor') },
-      { name: 'Shipping Manifest',    found: stageReached('clasificacion') || /rpt020|manifest/i.test(allText), date: stageDate('docs_proveedor') },
-      { name: 'Invoice comercial',    found: stageReached('clasificacion') || /invoice|26NI/i.test(allText),    date: stageDate('docs_proveedor') },
-      { name: 'Certificado calidad',  found: /certificad|quality cert/i.test(allText),                         date: stageDate('docs_proveedor') },
-      { name: 'COVE',                 found: stageReached('mve') || /\bcove\b/i.test(allText),                 date: stageDate('docs_despacho') },
-      { name: 'Pedimento',            found: stageReached('mve') || /pedimento/i.test(allText),                date: stageDate('docs_despacho') },
-      { name: 'DODA',                 found: stageReached('doda') || /\bdoda\b/i.test(allText),                date: stageDate('doda') },
+      { name: 'Bill of Lading',       found: stageReached('proforma') || /rpt040|lading/i.test(allText),   date: stageDate('docs_proveedor') },
+      { name: 'Shipping Manifest',    found: stageReached('proforma') || /rpt020|manifest/i.test(allText), date: stageDate('docs_proveedor') },
+      { name: 'Invoice comercial',    found: stageReached('proforma') || /invoice|26NI/i.test(allText),    date: stageDate('docs_proveedor') },
+      { name: 'Certificado calidad',  found: /certificad|quality cert/i.test(allText),                     date: stageDate('docs_proveedor') },
+      { name: 'Pedimento',            found: stageReached('mve') || /pedimento/i.test(allText),            date: stageDate('mve') },
+      { name: 'DODA',                 found: stageReached('doda') || /\bdoda\b/i.test(allText),            date: stageDate('doda') },
     ];
 
     const docsHtml = docs.map(d => `

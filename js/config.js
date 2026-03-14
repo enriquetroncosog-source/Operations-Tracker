@@ -11,8 +11,6 @@ const CONFIG = {
 const STAGES = [
   { id: 'docs_proveedor', label: 'Docs Proveedor' },
   { id: 'proforma',       label: 'Proforma Enviada' },
-  { id: 'clasificacion',  label: 'Clasificación' },
-  { id: 'docs_despacho',  label: 'COVE / Pedimento' },
   { id: 'mve',            label: 'MVE Recibida' },
   { id: 'doda',           label: 'DODA Enviado' },
   { id: 'despachado',     label: 'Despachado' },
