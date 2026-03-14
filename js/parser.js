@@ -80,7 +80,7 @@ const Parser = {
     // "despacho" in subject (not "despachado") = DODA stage
     if (/\bdespacho\b/i.test(subj)) return 'doda';
     if (/\bdoda\b|doda.*enviad/i.test(s)) return 'doda';
-    if (/\bmve\b|solicitud.*mve|mva/i.test(s)) return 'mve';
+    if (/\bmve\b|manifestaci[oó]n\s+de\s+valor|solicitud.*mve|mva/i.test(s)) return 'mve';
     if (/proforma|cotizaci/i.test(s)) return 'proforma';
     return 'docs_proveedor';
   },
