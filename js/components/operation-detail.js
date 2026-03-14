@@ -4,29 +4,56 @@
 
 const OperationDetail = {
 
-  // Only show relevant document types
-  isRelevantAttachment(filename) {
-    const f = filename.toLowerCase();
-    const keywords = ['invoice', 'inv', 'bol', 'lading', 'manifest', 'shipping', 'proforma', 'doda', 'shipper', 'rpt040', 'rpt020', 'factura'];
-    return keywords.some(kw => f.includes(kw));
+  // Fixed document slots with matching rules
+  DOC_SLOTS: [
+    { label: 'INVOICE',           match: ['invoice', 'inv', 'factura', 'ni0'] },
+    { label: 'BOL',               match: ['rpt040', 'bol', 'lading', 'bill of lading'] },
+    { label: 'SHIPPING MANIFEST', match: ['rpt020', 'manifest', 'shipping'] },
+    { label: 'PROFORMA',          match: ['proforma'] },
+    { label: 'MVE',               match: ['mve'] },
+    { label: 'DODA',              match: ['doda'] },
+    { label: 'SHIPPER',           match: ['shipper', 'shpr', 'ship'] },
+  ],
+
+  matchAttachmentToSlot(attachment) {
+    const f = (attachment.filename || '').toLowerCase();
+    for (const slot of this.DOC_SLOTS) {
+      if (slot.match.some(kw => f.includes(kw))) return slot.label;
+    }
+    return null;
   },
 
   renderAttachments(attachments) {
-    if (!attachments || !attachments.length) return '';
-    const filtered = attachments.filter(att => this.isRelevantAttachment(att.filename));
-    if (!filtered.length) return '';
+    // Build a map: slot label -> attachment (first match wins)
+    const slotMap = {};
+    for (const att of (attachments || [])) {
+      const slotLabel = this.matchAttachmentToSlot(att);
+      if (slotLabel && !slotMap[slotLabel]) {
+        slotMap[slotLabel] = att;
+      }
+    }
+
+    const downloadSvg = '<svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>';
+
     return `
       <div class="panel">
-        <div class="panel-title">Archivos adjuntos (${filtered.length})</div>
-        ${filtered.map(att => `
-          <div class="doc-item">
-            <div class="doc-icon yes">${this.fileIcon(att.filename)}</div>
-            <span class="doc-name">${att.filename}</span>
-            <button class="btn-icon" onclick="Gmail.downloadAttachment('${att.messageId}','${att.attachmentId}','${att.filename.replace(/'/g, "\\'")}')" title="Descargar">
-              <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
-            </button>
-          </div>
-        `).join('')}
+        <div class="panel-title">Archivos adjuntos</div>
+        ${this.DOC_SLOTS.map(slot => {
+          const att = slotMap[slot.label];
+          if (att) {
+            return `<div class="doc-item">
+              <div class="doc-icon yes">${this.fileIcon(att.filename)}</div>
+              <span class="doc-name">${slot.label}</span>
+              <button class="btn-icon" onclick="Gmail.downloadAttachment('${att.messageId}','${att.attachmentId}','${att.filename.replace(/'/g, "\\'")}')" title="Descargar ${att.filename}">${downloadSvg}</button>
+            </div>`;
+          } else {
+            return `<div class="doc-item">
+              <div class="doc-icon no">○</div>
+              <span class="doc-name" style="color:var(--text3)">${slot.label}</span>
+              <span class="doc-date"></span>
+            </div>`;
+          }
+        }).join('')}
       </div>`;
   },
 

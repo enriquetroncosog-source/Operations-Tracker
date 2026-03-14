@@ -10,11 +10,11 @@ const Parser = {
   },
 
   extractFactura(text) {
-    // Try multiple patterns for invoice/factura numbers
     const patterns = [
+      /Invoice[I]?(\d{2}NI\d{3,10})/i,        // InvoiceI26NI013718
+      /\b(\d{2}NI[-]?\d{3,10})\b/i,            // 26NI013718
       /(?:factura|invoice|inv)[:\s#]*\s*([A-Z0-9][-A-Z0-9]{4,20})/i,
       /\b(INV[-\s]?[A-Z0-9]{4,15})\b/i,
-      /\b(\d{2}NI[-]?\d{3,10})\b/i,  // Pattern like 26NI-xxxxx
     ];
     const falsePositives = ['PUEDEN','PARA','PAGO','POR','COMO','ESTE','ESTA','SERA','TIENE','FAVOR','ENVIAR','ADJUNTA','CORRESPONDIENTE','IMPO','EXPO'];
     for (const re of patterns) {
@@ -23,6 +23,16 @@ const Parser = {
         const val = m[1].toUpperCase();
         if (!falsePositives.includes(val)) return val;
       }
+    }
+    return null;
+  },
+
+  // Extract factura from attachment filenames
+  extractFacturaFromAttachments(attachments) {
+    for (const att of (attachments || [])) {
+      const f = att.filename || '';
+      const m = f.match(/Invoice[I]?(\d{2}NI\d{3,10})/i) || f.match(/(\d{2}NI[-]?\d{3,10})/i);
+      if (m) return m[1].toUpperCase();
     }
     return null;
   },
@@ -180,10 +190,12 @@ const Parser = {
       const pedimento = this.extractPedimento(fullText);
       const factura = this.extractFactura(fullText);
       const proveedor = this.extractProveedor(subject);
-      const transportista = this.extractTransportista(bodyText);
+      const transportista = this.extractTransportista(bodyText) || this.extractTransportista(snippet);
       const opData = this.extractOperationData(fullText);
       const summary = this.summarize(stage, subject);
       const attachments = Gmail.extractAttachments(msg);
+      // Try to extract factura from attachment filenames
+      const facturaFromAtt = this.extractFacturaFromAttachments(attachments);
 
       const keys = cajas.length ? cajas : ['_sin_caja'];
 
@@ -202,6 +214,7 @@ const Parser = {
         if (transportista && !groups[key].parties.transportista) groups[key].parties.transportista = transportista;
         if (pedimento) groups[key].pedimentos.add(pedimento);
         if (factura) groups[key].facturas.add(factura);
+        if (facturaFromAtt && !factura) groups[key].facturas.add(facturaFromAtt);
         // Merge operation data
         Object.assign(groups[key].opData, opData);
         // Collect attachments
