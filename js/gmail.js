@@ -40,6 +40,52 @@ const Gmail = {
     return h?.value || '';
   },
 
+  // Extract attachment info from a message
+  extractAttachments(msg) {
+    const attachments = [];
+    const walk = (parts) => {
+      for (const part of (parts || [])) {
+        if (part.filename && part.filename.length > 0 && part.body) {
+          attachments.push({
+            filename: part.filename,
+            mimeType: part.mimeType || '',
+            size: part.body.size || 0,
+            attachmentId: part.body.attachmentId,
+            messageId: msg.id,
+          });
+        }
+        if (part.parts) walk(part.parts);
+      }
+    };
+    walk(msg.payload?.parts || []);
+    return attachments;
+  },
+
+  // Download an attachment
+  async downloadAttachment(messageId, attachmentId, filename) {
+    const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages/${messageId}/attachments/${attachmentId}`;
+    const r = await fetch(url, {
+      headers: { Authorization: 'Bearer ' + Auth.getToken() }
+    });
+    const data = await r.json();
+    if (data.data) {
+      // Convert base64url to regular base64
+      const b64 = data.data.replace(/-/g, '+').replace(/_/g, '/');
+      const byteChars = atob(b64);
+      const byteNumbers = new Array(byteChars.length);
+      for (let i = 0; i < byteChars.length; i++) {
+        byteNumbers[i] = byteChars.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray]);
+      const link = document.createElement('a');
+      link.href = URL.createObjectURL(blob);
+      link.download = filename;
+      link.click();
+      URL.revokeObjectURL(link.href);
+    }
+  },
+
   extractBodyText(msg) {
     try {
       const walk = (parts) => {

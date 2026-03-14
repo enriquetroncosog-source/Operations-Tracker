@@ -89,9 +89,36 @@ const Parser = {
 
   // Extract transportista from text
   extractTransportista(text) {
-    const m = text.match(/(?:transportista|carrier|trucker|fletera)[:\s]+([^,|\n]+)/i);
-    if (m) return m[1].trim();
+    // Pattern: "Transfer Carrier\nCOMPANY NAME" or "Carrier:\nNAME"
+    const patterns = [
+      /Transfer\s+Carrier\s*\n\s*([A-Z][A-Z\s&.,]+(?:INC|LLC|SA|CORP)?)/i,
+      /(?:transportista|carrier|trucker|fletera)[:\s]*\n?\s*([A-Z][A-Z\s&.,]{3,}(?:INC|LLC|SA|CORP)?)/i,
+      /(?:transportista|carrier|trucker|fletera)[:\s]+([^,\n|]{3,})/i,
+    ];
+    for (const re of patterns) {
+      const m = text.match(re);
+      if (m) {
+        const val = m[1].trim();
+        if (val.length > 2 && !/^SCAC$/i.test(val)) return val;
+      }
+    }
     return null;
+  },
+
+  // Extract additional operation data from email body
+  extractOperationData(text) {
+    const data = {};
+    const arriveM = text.match(/Arrive\s*#?[:\s]*(\d+)/i);
+    if (arriveM) data.arrive = arriveM[1];
+    const placasM = text.match(/Placas?[:\s]*([A-Z0-9]{5,10})/i);
+    if (placasM) data.placas = placasM[1].toUpperCase();
+    const poM = text.match(/\bPO[:\s#]*([A-Z0-9]{4,15})/i);
+    if (poM) data.po = poM[1].toUpperCase();
+    const bolM = text.match(/BOL\s*#?\s*([A-Z0-9]{4,15})/i);
+    if (bolM) data.bol = bolM[1].toUpperCase();
+    const scacM = text.match(/SCAC\s*\n?\s*([A-Z]{2,6})/i);
+    if (scacM) data.scac = scacM[1].toUpperCase();
+    return data;
   },
 
   // Generate a one-line summary based on stage and context
@@ -153,8 +180,10 @@ const Parser = {
       const pedimento = this.extractPedimento(fullText);
       const factura = this.extractFactura(fullText);
       const proveedor = this.extractProveedor(subject);
-      const transportista = this.extractTransportista(fullText);
+      const transportista = this.extractTransportista(bodyText);
+      const opData = this.extractOperationData(fullText);
       const summary = this.summarize(stage, subject);
+      const attachments = Gmail.extractAttachments(msg);
 
       const keys = cajas.length ? cajas : ['_sin_caja'];
 
@@ -162,7 +191,8 @@ const Parser = {
         if (!groups[key]) {
           groups[key] = {
             caja: key, emails: [], stages: new Set(),
-            parties: {}, pedimentos: new Set(), facturas: new Set()
+            parties: {}, pedimentos: new Set(), facturas: new Set(),
+            opData: {}, attachments: []
           };
         }
         groups[key].emails.push({ subject, from, fromName: name, date, stage, party, pedimento, factura, summary });
@@ -172,6 +202,10 @@ const Parser = {
         if (transportista && !groups[key].parties.transportista) groups[key].parties.transportista = transportista;
         if (pedimento) groups[key].pedimentos.add(pedimento);
         if (factura) groups[key].facturas.add(factura);
+        // Merge operation data
+        Object.assign(groups[key].opData, opData);
+        // Collect attachments
+        if (attachments.length) groups[key].attachments.push(...attachments);
       });
     });
 
@@ -195,6 +229,8 @@ const Parser = {
           stages: g.stages,
           pedimentos,
           facturas,
+          opData: g.opData || {},
+          attachments: g.attachments || [],
           status: this.getStatus(highestStage),
         };
       })

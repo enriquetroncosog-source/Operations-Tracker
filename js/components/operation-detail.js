@@ -4,6 +4,16 @@
 
 const OperationDetail = {
 
+  fileIcon(filename) {
+    const ext = (filename || '').split('.').pop().toLowerCase();
+    if (['pdf'].includes(ext)) return 'PDF';
+    if (['xls', 'xlsx', 'csv'].includes(ext)) return 'XLS';
+    if (['doc', 'docx'].includes(ext)) return 'DOC';
+    if (['jpg', 'jpeg', 'png', 'gif'].includes(ext)) return 'IMG';
+    if (['xml'].includes(ext)) return 'XML';
+    return 'FILE';
+  },
+
   render(op) {
     const dv = document.getElementById('detail-view');
     Router.navigate('detail');
@@ -63,18 +73,39 @@ const OperationDetail = {
     `).join('');
 
     // Operation info
+    const d = op.opData || {};
     const infoHtml = `
       <div class="info-row">
         <span class="info-label">Caja</span>
         <span class="info-value">${op.caja}</span>
       </div>
+      ${op.facturas.length ? `<div class="info-row">
+        <span class="info-label">Factura</span>
+        <span class="info-value">${op.facturas.join(', ')}</span>
+      </div>` : ''}
       ${op.pedimentos.length ? `<div class="info-row">
         <span class="info-label">Pedimento</span>
         <span class="info-value">${op.pedimentos.join(', ')}</span>
       </div>` : ''}
-      ${op.facturas.length ? `<div class="info-row">
-        <span class="info-label">Factura</span>
-        <span class="info-value">${op.facturas.join(', ')}</span>
+      ${d.po ? `<div class="info-row">
+        <span class="info-label">PO</span>
+        <span class="info-value">${d.po}</span>
+      </div>` : ''}
+      ${d.bol ? `<div class="info-row">
+        <span class="info-label">BOL</span>
+        <span class="info-value">${d.bol}</span>
+      </div>` : ''}
+      ${d.arrive ? `<div class="info-row">
+        <span class="info-label">Arrive #</span>
+        <span class="info-value">${d.arrive}</span>
+      </div>` : ''}
+      ${d.placas ? `<div class="info-row">
+        <span class="info-label">Placas</span>
+        <span class="info-value">${d.placas}</span>
+      </div>` : ''}
+      ${d.scac ? `<div class="info-row">
+        <span class="info-label">SCAC</span>
+        <span class="info-value">${d.scac}</span>
       </div>` : ''}
       <div class="info-row">
         <span class="info-label">Status</span>
@@ -151,10 +182,23 @@ const OperationDetail = {
             <div class="panel-title">Documentos</div>
             ${docsHtml}
           </div>
-          <div class="panel">
+          <div class="panel" style="margin-bottom:10px">
             <div class="panel-title">Partes</div>
             ${partiesHtml}
           </div>
+          ${op.attachments && op.attachments.length ? `
+          <div class="panel">
+            <div class="panel-title">Archivos adjuntos (${op.attachments.length})</div>
+            ${op.attachments.map((att, idx) => `
+              <div class="doc-item">
+                <div class="doc-icon yes">${this.fileIcon(att.filename)}</div>
+                <span class="doc-name">${att.filename}</span>
+                <button class="btn-icon" onclick="Gmail.downloadAttachment('${att.messageId}','${att.attachmentId}','${att.filename.replace(/'/g, "\\'")}')" title="Descargar">
+                  <svg width="14" height="14" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+                </button>
+              </div>
+            `).join('')}
+          </div>` : ''}
         </div>
         <div class="panel">
           <div class="panel-title">Log de correos (${op.emails.length})</div>
