@@ -50,11 +50,10 @@ const OperationDetail = {
       </div>
     `).join('');
 
-    // Parties
-    const partyOrder = ['proveedor', 'transportista', 'agencia', 'cliente'];
-    const partyLabels = { proveedor: 'Proveedor', transportista: 'Transportista', agencia: 'Agencia', cliente: 'Cliente' };
+    // Parties (solo proveedor y transportista)
+    const partyOrder = ['proveedor', 'transportista'];
+    const partyLabels = { proveedor: 'Proveedor', transportista: 'Transportista' };
     const allParties = { ...op.parties };
-    if (!allParties.cliente) allParties.cliente = 'CECSO';
 
     const partiesHtml = partyOrder.map(p => `
       <div class="party-item">
@@ -98,6 +97,7 @@ const OperationDetail = {
             <span class="e-time">${Parser.fmtDateTime(e.date)}</span>
           </div>
           <div class="e-subj" title="${e.subject}">${e.subject}</div>
+          ${e.snippet ? `<div class="e-snippet">${e.snippet}</div>` : ''}
         </div>
       </div>
     `).join('');
@@ -114,7 +114,6 @@ const OperationDetail = {
     }
 
     const lu = Parser.fmtDateTime(op.lastUpdate);
-    const partyNames = Object.values(op.parties).slice(0, 2).join(' · ');
 
     dv.innerHTML = `
       <button class="back-btn" id="detail-back">
@@ -128,8 +127,6 @@ const OperationDetail = {
         <div>
           <div class="detail-ref">Caja ${op.caja}</div>
           <div class="detail-sub">
-            <span>CECSO</span>
-            ${partyNames ? `<span>${partyNames}</span>` : ''}
             ${op.pedimentos.length ? `<span>Ped: ${op.pedimentos.join(', ')}</span>` : ''}
             ${op.facturas.length ? `<span>Fac: ${op.facturas.join(', ')}</span>` : ''}
             <span>${lu}</span>

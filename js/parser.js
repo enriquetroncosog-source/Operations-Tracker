@@ -10,8 +10,14 @@ const Parser = {
   },
 
   extractFactura(text) {
-    const m = text.match(/factura[:\s#]+([A-Z0-9]{4,20})/i);
-    return m ? m[1].toUpperCase() : null;
+    // Match factura followed by a number/code, but exclude common Spanish words
+    const m = text.match(/factura[:\s#]+([A-Z0-9][-A-Z0-9]{3,20})/i);
+    if (!m) return null;
+    const val = m[1].toUpperCase();
+    // Filter out false positives (Spanish words that appear after "factura")
+    const falsePositives = ['PUEDEN', 'PARA', 'PAGO', 'POR', 'COMO', 'ESTE', 'ESTA', 'SERA', 'TIENE', 'FAVOR', 'ENVIAR', 'ADJUNTA', 'CORRESPONDIENTE'];
+    if (falsePositives.includes(val)) return null;
+    return val;
   },
 
   extractCajas(text) {
@@ -115,7 +121,8 @@ const Parser = {
             parties: {}, pedimentos: new Set(), facturas: new Set()
           };
         }
-        groups[key].emails.push({ subject, from, fromName: name, date, stage, party, pedimento, factura });
+        const snippet_clean = (snippet || '').substring(0, 120);
+        groups[key].emails.push({ subject, from, fromName: name, date, stage, party, pedimento, factura, snippet: snippet_clean });
         groups[key].stages.add(stage);
         if (!groups[key].parties[party]) groups[key].parties[party] = name;
         if (pedimento) groups[key].pedimentos.add(pedimento);
