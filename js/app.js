@@ -116,7 +116,13 @@ const App = {
       const bodyText = Gmail.extractBodyText(msg);
       const fullText = subject + ' ' + snippet + ' ' + bodyText;
 
-      const stage = Parser.detectStage(subject, from, snippet + ' ' + bodyText);
+      const msgAttachments = Gmail.extractAttachments(msg);
+      let stage = Parser.detectStage(subject, from, snippet + ' ' + bodyText);
+      // If stage is docs_proveedor, check attachments for better detection
+      if (stage === 'docs_proveedor') {
+        const attStage = Parser.detectStageFromAttachments(msgAttachments);
+        if (attStage) stage = attStage;
+      }
       const party = Parser.detectParty(from);
       const stageIdx = STAGE_IDX[stage] ?? 0;
       if (stageIdx > highestStage) highestStage = stageIdx;
@@ -125,7 +131,6 @@ const App = {
       if (ped) pedimentos.add(ped);
       Object.assign(opData, Parser.extractOperationData(fullText));
 
-      const msgAttachments = Gmail.extractAttachments(msg);
       if (msgAttachments.length) attachments.push(...msgAttachments);
 
       emails.push({

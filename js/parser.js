@@ -81,8 +81,19 @@ const Parser = {
     if (/\bdespacho\b/i.test(subj)) return 'doda';
     if (/\bdoda\b|doda.*enviad/i.test(s)) return 'doda';
     if (/\bmve\b|manifestaci[oó]n|envio\s+manifestaci|acuse.*manifestaci|solicitud.*mve|mva/i.test(s)) return 'mve';
-    if (/proforma|cotizaci/i.test(s)) return 'proforma';
+    if (/proforma|cotizaci|\bpedimento\b/i.test(s)) return 'proforma';
     return 'docs_proveedor';
+  },
+
+  // Also detect proforma stage from attachment filenames
+  detectStageFromAttachments(attachments) {
+    for (const att of (attachments || [])) {
+      const f = (att.filename || '').toLowerCase();
+      if (/pedimento|proforma/i.test(f)) return 'proforma';
+      if (/\bmve\b|manifestaci/i.test(f)) return 'mve';
+      if (/\bdoda\b/i.test(f)) return 'doda';
+    }
+    return null;
   },
 
   detectParty(from) {
