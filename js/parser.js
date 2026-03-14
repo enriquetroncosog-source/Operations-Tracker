@@ -101,33 +101,38 @@ const Parser = {
   extractTransportista(text) {
     const t = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    // Debug: log body text to console so we can see what's there
+    // Debug
     if (t.length > 50) {
-      console.log('[CIS DEBUG transportista] searching in:', t.substring(0, 500));
+      console.log('[CIS DEBUG transportista] text:', t.substring(0, 800));
     }
 
-    // 1. Exact pattern: "Transfer Carrier" followed by company name
-    const m1 = t.match(/Transfer\s+Carrier[\s\n:]+([^\n]{3,50})/i);
+    // 1. "Transfer Carrier" followed by company name (any spacing/newlines)
+    const m1 = t.match(/Transfer\s+Carrier[\s\n:]*([A-Z][A-Z0-9 &.'-]{3,50})/i);
     if (m1) {
-      const val = m1[1].trim();
+      const val = m1[1].trim().replace(/\s+/g, ' ');
       console.log('[CIS DEBUG] Transfer Carrier match:', val);
       if (val.length > 3) return val;
     }
 
-    // 2. Company names containing trucking/transport keywords
-    const m2 = t.match(/\b(\w[\w\s&.'-]*(?:TRUCKING|TRANSPORT|FREIGHT|LOGISTICS|CARRIERS?|FORWARDING)[\w\s.]*(?:INC|LLC|SA|CORP|CO)?)\b/i);
+    // 2. "INTRANSPORT" or known carrier names directly
+    const m1b = t.match(/\b(INTRANSPORT[\w\s.]*(?:INC)?)\b/i);
+    if (m1b) return m1b[1].trim().replace(/\s+/g, ' ');
+
+    // 3. Company names with trucking keywords - but NOT URLs or email domains
+    const m2 = t.match(/\b([A-Z][A-Z0-9 &.'-]+\s+(?:TRUCKING|TRANSPORT|FREIGHT|FORWARDING)\s*(?:INC|LLC|SA|CORP|CO|DE CV)?)\b/);
     if (m2) {
       const val = m2[1].trim().replace(/\s+/g, ' ');
       console.log('[CIS DEBUG] Company keyword match:', val);
-      if (val.length > 5 && val.length < 60) return val;
+      // Exclude URLs and email domains
+      if (val.length > 5 && val.length < 60 && !val.includes('.com') && !val.includes('@')) return val;
     }
 
-    // 3. Label: "Transportista: COMPANY" or "Carrier: COMPANY"
+    // 4. Label: "Transportista: COMPANY" or "Carrier: COMPANY"
     const m3 = t.match(/(?:^|\n)\s*(?:transportista|carrier|fletera)\s*[:\-]\s*([^\n]{3,50})/im);
     if (m3) {
       const val = m3[1].trim();
       console.log('[CIS DEBUG] Label match:', val);
-      if (val.length > 3) return val;
+      if (val.length > 3 && !val.includes('.com') && !val.includes('@')) return val;
     }
 
     return null;

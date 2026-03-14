@@ -88,22 +88,34 @@ const Gmail = {
 
   extractBodyText(msg) {
     try {
-      const walk = (parts) => {
+      const decode = (data) => atob(data.replace(/-/g, '+').replace(/_/g, '/'));
+
+      // Walk parts looking for text/plain first, then text/html as fallback
+      const walkFor = (parts, mimeType) => {
         for (const part of (parts || [])) {
-          if (part?.mimeType === 'text/plain' && part?.body?.data) {
-            return atob(part.body.data.replace(/-/g, '+').replace(/_/g, '/')).substring(0, 2000);
+          if (part?.mimeType === mimeType && part?.body?.data) {
+            return decode(part.body.data).substring(0, 3000);
           }
           if (part?.parts) {
-            const found = walk(part.parts);
+            const found = walkFor(part.parts, mimeType);
             if (found) return found;
           }
         }
         return null;
       };
-      const fromParts = walk(msg.payload?.parts || []);
-      if (fromParts) return fromParts;
+
+      // Try text/plain first
+      let body = walkFor(msg.payload?.parts || [], 'text/plain');
+      // Fallback to text/html and strip tags
+      if (!body) {
+        body = walkFor(msg.payload?.parts || [], 'text/html');
+        if (body) body = body.replace(/<[^>]+>/g, ' ').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ');
+      }
+      if (body) return body;
+
+      // Top-level body
       if (msg.payload?.body?.data) {
-        return atob(msg.payload.body.data.replace(/-/g, '+').replace(/_/g, '/')).substring(0, 2000);
+        return decode(msg.payload.body.data).substring(0, 3000);
       }
     } catch (e) {
       console.log('[Gmail] body extract error:', e.message);
