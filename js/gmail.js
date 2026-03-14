@@ -94,7 +94,7 @@ const Gmail = {
       const walkFor = (parts, mimeType) => {
         for (const part of (parts || [])) {
           if (part?.mimeType === mimeType && part?.body?.data) {
-            return decode(part.body.data).substring(0, 3000);
+            return decode(part.body.data).substring(0, 5000);
           }
           if (part?.parts) {
             const found = walkFor(part.parts, mimeType);
@@ -115,7 +115,7 @@ const Gmail = {
 
       // Top-level body
       if (msg.payload?.body?.data) {
-        return decode(msg.payload.body.data).substring(0, 3000);
+        return decode(msg.payload.body.data).substring(0, 5000);
       }
     } catch (e) {
       console.log('[Gmail] body extract error:', e.message);

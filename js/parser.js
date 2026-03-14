@@ -84,8 +84,39 @@ const Parser = {
     if (f.includes('cecso')) return 'cliente';
     if (f.includes('new-indy') || f.includes('newmill') || f.includes('noreply')) return 'proveedor';
     if (f.includes('troncoso') || f.includes('logistico') || f.includes('tj@') || f.includes('operacion')) return 'agencia';
-    if (f.includes('transport') || f.includes('carrier') || f.includes('trucking')) return 'transportista';
+    if (f.includes('transport') || f.includes('carrier') || f.includes('trucking') ||
+        f.includes('logistics') || f.includes('freight') || f.includes('dlr') ||
+        f.includes('arrive') || f.includes('fletera')) return 'transportista';
     return 'agencia';
+  },
+
+  // Extract transportista company name from email From field
+  extractTransportistaFromEmail(from) {
+    const f = from.toLowerCase();
+    // Check if this is a transportista email
+    const transportKw = ['transport', 'carrier', 'trucking', 'logistics', 'freight', 'dlr', 'arrive', 'fletera'];
+    if (!transportKw.some(kw => f.includes(kw))) return null;
+    // Try to get display name first
+    const nameMatch = from.match(/^"?([^"<]+)"?\s*</);
+    if (nameMatch) {
+      const name = nameMatch[1].trim();
+      if (name.length > 2 && !/^[a-z0-9._%+-]+@/i.test(name)) return name;
+    }
+    // Extract from domain: user@arrivelogistics.com -> Arrive Logistics
+    const domainMatch = from.match(/@([a-z0-9.-]+)\./i);
+    if (domainMatch) {
+      const domain = domainMatch[1].replace(/\.(com|net|org|mx)$/i, '');
+      // Split camelCase or known patterns
+      const pretty = domain
+        .replace(/logistics/i, ' Logistics')
+        .replace(/transport/i, ' Transport')
+        .replace(/trucking/i, ' Trucking')
+        .replace(/freight/i, ' Freight')
+        .replace(/^(\w)/, (m) => m.toUpperCase())
+        .trim();
+      if (pretty.length > 2) return pretty;
+    }
+    return null;
   },
 
   // Extract proveedor name from subject (pattern: "IMPO | Proveedor | ...")
@@ -101,29 +132,21 @@ const Parser = {
   extractTransportista(text) {
     const t = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n');
 
-    // Debug
-    if (t.length > 50) {
-      console.log('[CIS DEBUG transportista] text:', t.substring(0, 800));
-    }
-
-    // 1. "Transfer Carrier" followed by company name (any spacing/newlines)
-    const m1 = t.match(/Transfer\s+Carrier[\s\n:]*([A-Z][A-Z0-9 &.'-]{3,50})/i);
+    // 1. "Transfer Carrier" followed by company name (handle newlines, spaces, colons)
+    const m1 = t.match(/Transfer\s+Carrier[\s\n:]*([A-Z][A-Z0-9 &.'\-]{3,50})/i);
     if (m1) {
       const val = m1[1].trim().replace(/\s+/g, ' ');
-      console.log('[CIS DEBUG] Transfer Carrier match:', val);
       if (val.length > 3) return val;
     }
 
     // 2. "INTRANSPORT" or known carrier names directly
-    const m1b = t.match(/\b(INTRANSPORT[\w\s.]*(?:INC)?)\b/i);
+    const m1b = t.match(/\b(INTRANSPORT(?:\s+TRUCKING)?(?:\s+INC)?)\b/i);
     if (m1b) return m1b[1].trim().replace(/\s+/g, ' ');
 
     // 3. Company names with trucking keywords - but NOT URLs or email domains
-    const m2 = t.match(/\b([A-Z][A-Z0-9 &.'-]+\s+(?:TRUCKING|TRANSPORT|FREIGHT|FORWARDING)\s*(?:INC|LLC|SA|CORP|CO|DE CV)?)\b/);
+    const m2 = t.match(/\b([A-Z][A-Z0-9 &.'\-]+\s+(?:TRUCKING|TRANSPORT|FREIGHT|FORWARDING|LOGISTICS)\s*(?:INC|LLC|SA|CORP|CO|DE CV)?)\b/);
     if (m2) {
       const val = m2[1].trim().replace(/\s+/g, ' ');
-      console.log('[CIS DEBUG] Company keyword match:', val);
-      // Exclude URLs and email domains
       if (val.length > 5 && val.length < 60 && !val.includes('.com') && !val.includes('@')) return val;
     }
 
@@ -131,7 +154,6 @@ const Parser = {
     const m3 = t.match(/(?:^|\n)\s*(?:transportista|carrier|fletera)\s*[:\-]\s*([^\n]{3,50})/im);
     if (m3) {
       const val = m3[1].trim();
-      console.log('[CIS DEBUG] Label match:', val);
       if (val.length > 3 && !val.includes('.com') && !val.includes('@')) return val;
     }
 
@@ -213,7 +235,8 @@ const Parser = {
       const pedimento = this.extractPedimento(fullText);
       const factura = this.extractFactura(fullText);
       const proveedor = this.extractProveedor(subject);
-      const transportista = this.extractTransportista(bodyText) || this.extractTransportista(snippet) || this.extractTransportista(fullText);
+      const transportista = this.extractTransportista(bodyText) || this.extractTransportista(snippet) || this.extractTransportista(fullText)
+        || (party === 'transportista' ? this.extractTransportistaFromEmail(from) : null);
       const opData = this.extractOperationData(fullText);
       const summary = this.summarize(stage, subject);
       const attachments = Gmail.extractAttachments(msg);
