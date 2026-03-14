@@ -66,8 +66,10 @@ const Parser = {
   },
 
   detectStage(subject, from, snippet = '') {
+    const subj = subject.toLowerCase();
     const s = (subject + ' ' + from + ' ' + snippet).toLowerCase();
 
+    // "despachado" or "despachada" = dispatched
     if (/factura.*honorar|honorarios|facturaci/i.test(s)) return 'despachado';
     if (
       /\bdespachad[ao]\b/i.test(s) ||
@@ -75,6 +77,8 @@ const Parser = {
       /liberado|libre|salida.*aduana/i.test(s)
     ) return 'despachado';
 
+    // "despacho" in subject (not "despachado") = DODA stage
+    if (/\bdespacho\b/i.test(subj)) return 'doda';
     if (/\bdoda\b|doda.*enviad/i.test(s)) return 'doda';
     if (/\bmve\b|solicitud.*mve|mva/i.test(s)) return 'mve';
     if (/proforma|cotizaci/i.test(s)) return 'proforma';
