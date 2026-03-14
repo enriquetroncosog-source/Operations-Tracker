@@ -10,14 +10,21 @@ const Parser = {
   },
 
   extractFactura(text) {
-    // Match factura followed by a number/code, but exclude common Spanish words
-    const m = text.match(/factura[:\s#]+([A-Z0-9][-A-Z0-9]{3,20})/i);
-    if (!m) return null;
-    const val = m[1].toUpperCase();
-    // Filter out false positives (Spanish words that appear after "factura")
-    const falsePositives = ['PUEDEN', 'PARA', 'PAGO', 'POR', 'COMO', 'ESTE', 'ESTA', 'SERA', 'TIENE', 'FAVOR', 'ENVIAR', 'ADJUNTA', 'CORRESPONDIENTE'];
-    if (falsePositives.includes(val)) return null;
-    return val;
+    // Try multiple patterns for invoice/factura numbers
+    const patterns = [
+      /(?:factura|invoice|inv)[:\s#]*\s*([A-Z0-9][-A-Z0-9]{4,20})/i,
+      /\b(INV[-\s]?[A-Z0-9]{4,15})\b/i,
+      /\b(\d{2}NI[-]?\d{3,10})\b/i,  // Pattern like 26NI-xxxxx
+    ];
+    const falsePositives = ['PUEDEN','PARA','PAGO','POR','COMO','ESTE','ESTA','SERA','TIENE','FAVOR','ENVIAR','ADJUNTA','CORRESPONDIENTE','IMPO','EXPO'];
+    for (const re of patterns) {
+      const m = text.match(re);
+      if (m) {
+        const val = m[1].toUpperCase();
+        if (!falsePositives.includes(val)) return val;
+      }
+    }
+    return null;
   },
 
   extractCajas(text) {
@@ -71,6 +78,40 @@ const Parser = {
     return 'agencia';
   },
 
+  // Extract proveedor name from subject (pattern: "IMPO | Proveedor | ...")
+  extractProveedor(subject) {
+    const m = subject.match(/IMPO\s*\|\s*([^|]+)\s*\|/i);
+    if (m) return m[1].trim();
+    const m2 = subject.match(/(?:proveedor|supplier)[:\s]+([^,|\/]+)/i);
+    if (m2) return m2[1].trim();
+    return null;
+  },
+
+  // Extract transportista from text
+  extractTransportista(text) {
+    const m = text.match(/(?:transportista|carrier|trucker|fletera)[:\s]+([^,|\n]+)/i);
+    if (m) return m[1].trim();
+    return null;
+  },
+
+  // Generate a one-line summary based on stage and context
+  summarize(stage, subject) {
+    const summaries = {
+      docs_proveedor: 'Documentación del proveedor recibida',
+      proforma: 'Proforma enviada al cliente',
+      mve: 'MVE recibida - en proceso de revisión',
+      doda: 'DODA enviado - mercancía lista en bodega',
+      despachado: 'Operación despachada',
+    };
+    // Try to extract useful context from subject
+    const bolMatch = subject.match(/BOL\s*#?\s*([A-Z0-9]+)/i);
+    const arriveMatch = subject.match(/Arrive\s+(\d+)/i);
+    let extra = '';
+    if (bolMatch) extra += ` · BOL: ${bolMatch[1]}`;
+    if (arriveMatch) extra += ` · Arrive: ${arriveMatch[1]}`;
+    return (summaries[stage] || 'Correo de la operación') + extra;
+  },
+
   parseName(from) {
     const m = from.match(/^"?([^"<]+)"?\s*</);
     if (m) return m[1].trim();
@@ -111,6 +152,9 @@ const Parser = {
       const name = this.parseName(from);
       const pedimento = this.extractPedimento(fullText);
       const factura = this.extractFactura(fullText);
+      const proveedor = this.extractProveedor(subject);
+      const transportista = this.extractTransportista(fullText);
+      const summary = this.summarize(stage, subject);
 
       const keys = cajas.length ? cajas : ['_sin_caja'];
 
@@ -121,10 +165,11 @@ const Parser = {
             parties: {}, pedimentos: new Set(), facturas: new Set()
           };
         }
-        const snippet_clean = (snippet || '').substring(0, 120);
-        groups[key].emails.push({ subject, from, fromName: name, date, stage, party, pedimento, factura, snippet: snippet_clean });
+        groups[key].emails.push({ subject, from, fromName: name, date, stage, party, pedimento, factura, summary });
         groups[key].stages.add(stage);
         if (!groups[key].parties[party]) groups[key].parties[party] = name;
+        if (proveedor && !groups[key].parties.proveedor) groups[key].parties.proveedor = proveedor;
+        if (transportista && !groups[key].parties.transportista) groups[key].parties.transportista = transportista;
         if (pedimento) groups[key].pedimentos.add(pedimento);
         if (factura) groups[key].facturas.add(factura);
       });

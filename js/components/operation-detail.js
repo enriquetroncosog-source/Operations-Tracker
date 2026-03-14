@@ -97,7 +97,7 @@ const OperationDetail = {
             <span class="e-time">${Parser.fmtDateTime(e.date)}</span>
           </div>
           <div class="e-subj" title="${e.subject}">${e.subject}</div>
-          ${e.snippet ? `<div class="e-snippet">${e.snippet}</div>` : ''}
+          ${e.summary ? `<div class="e-snippet">${e.summary}</div>` : ''}
         </div>
       </div>
     `).join('');
